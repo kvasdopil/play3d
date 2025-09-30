@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid } from '@react-three/drei';
+import { OrbitControls, Grid, TransformControls } from '@react-three/drei';
+import type { Object3D } from 'three';
 import { IoSettingsSharp, IoTrashSharp } from 'react-icons/io5';
+import { TbArrowsMove, TbRotate3D, TbArrowsMaximize } from 'react-icons/tb';
 import { RotatingCube } from './RotatingCube';
 import { SettingsModal } from './components/SettingsModal';
 import { PromptInput } from './components/PromptInput';
@@ -20,6 +22,9 @@ import {
     getSceneObjects,
     saveSceneObjects,
 } from './services/storage';
+import { FaRotate } from 'react-icons/fa6';
+import { PiResizeBold } from 'react-icons/pi';
+import { FaArrowsAlt } from 'react-icons/fa';
 
 // (removed CanvasLogger debug component)
 
@@ -40,6 +45,14 @@ export function Scene() {
     const [error3D, setError3D] = useState<string | undefined>();
     const [sceneObjects, setSceneObjects] = useState<SceneObject[]>([]);
     const [isSceneLoaded, setIsSceneLoaded] = useState(false);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [orbitEnabled, setOrbitEnabled] = useState(true);
+    const [isTransforming, setIsTransforming] = useState(false);
+    type TransformMode = 'translate' | 'rotate' | 'scale';
+    const [transformMode, setTransformMode] = useState<TransformMode>('translate');
+
+    // Map of scene object id -> 3D group reference
+    const objectRefs = useRef<Record<string, Object3D | null>>({});
 
     // Track what changed between renders
     const prevStateRef = useRef({
@@ -75,6 +88,9 @@ export function Scene() {
             isSceneLoaded,
         };
     });
+
+    // Compute selected object for this render
+    const selectedObject: Object3D | null = selectedId ? (objectRefs.current[selectedId] ?? null) : null;
 
     // Load persisted scene objects on mount
     useEffect(() => {
@@ -309,6 +325,7 @@ export function Scene() {
                     fov: 50,
                 }}
                 style={{ background: '#d3d3d3' }}
+                onPointerMissed={() => setSelectedId(null)}
             >
                 {/* Ambient light for general illumination */}
                 <ambientLight intensity={10.0} />
@@ -335,14 +352,88 @@ export function Scene() {
                 {/* Display all scene objects or rotating cube placeholder */}
                 {sceneObjects.length > 0 ? (
                     sceneObjects.map((obj) => (
-                        <Model3D
+                        <group
                             key={obj.id}
-                            modelUrl={obj.modelUrl}
-                            transform={obj.transform}
-                        />
+                            ref={(el) => {
+                                if (el) {
+                                    objectRefs.current[obj.id] = el;
+                                } else {
+                                    delete objectRefs.current[obj.id];
+                                }
+                            }}
+                            position={obj.transform.position}
+                            rotation={obj.transform.rotation}
+                            scale={obj.transform.scale}
+                            userData={{ id: obj.id }}
+                            onPointerDown={(e) => {
+                                // Ignore selection while manipulating transform gizmo
+                                if (isTransforming) {
+                                    return;
+                                }
+                                e.stopPropagation();
+                                // Debug details to verify which object receives the event
+                                // Note: event.object is the intersected child, event.eventObject is this group
+                                // eslint-disable-next-line no-console
+                                console.log('[select]', {
+                                    id: obj.id,
+                                    modelUrl: obj.modelUrl,
+                                    intersectedUuid: e.object.uuid,
+                                    targetUuid: e.eventObject.uuid,
+                                });
+                                setSelectedId(obj.id);
+                            }}
+                        >
+                            <Model3D modelUrl={obj.modelUrl} />
+                        </group>
                     ))
                 ) : (
                     <RotatingCube />
+                )}
+
+                {/* Transform controls attached to the selected object */}
+                {selectedObject && (
+                    <TransformControls
+                        key={selectedId ?? 'none'}
+                        object={selectedObject}
+                        mode={transformMode}
+                        onMouseDown={() => {
+                            setOrbitEnabled(false);
+                            setIsTransforming(true);
+                        }}
+                        onMouseUp={() => {
+                            setOrbitEnabled(true);
+                            setIsTransforming(false);
+                            const id = selectedId;
+                            const o = id ? objectRefs.current[id] ?? null : null;
+                            if (o && id) {
+                                const newPos: [number, number, number] = [
+                                    o.position.x,
+                                    o.position.y,
+                                    o.position.z,
+                                ];
+                                const newRot: [number, number, number] = [
+                                    o.rotation.x,
+                                    o.rotation.y,
+                                    o.rotation.z,
+                                ];
+                                const newScale = o.scale.x;
+                                setSceneObjects((prev) =>
+                                    prev.map((p) =>
+                                        p.id === id
+                                            ? {
+                                                ...p,
+                                                transform: {
+                                                    position: newPos,
+                                                    rotation: newRot,
+                                                    scale: newScale,
+                                                },
+                                            }
+                                            : p
+                                    )
+                                );
+                            }
+                        }}
+                    />
                 )}
 
                 {/* Orbit controls for camera rotation and zoom */}
@@ -350,8 +441,39 @@ export function Scene() {
                     enableDamping
                     dampingFactor={0.05}
                     target={[0, 0, 0]} // Look at origin
+                    enabled={orbitEnabled}
                 />
             </Canvas>
+
+            {/* Transform mode toolbar */}
+            {selectedId && (
+                <div className="absolute top-4 left-4 z-10 flex gap-2 bg-white/90 rounded-lg shadow-lg p-1">
+                    <button
+                        onClick={() => setTransformMode('translate')}
+                        className={`${transformMode === 'translate' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'} px-3 py-1 rounded flex items-center justify-center`}
+                        aria-label="Move"
+                        title="Move"
+                    >
+                        <FaArrowsAlt size={18} />
+                    </button>
+                    <button
+                        onClick={() => setTransformMode('rotate')}
+                        className={`${transformMode === 'rotate' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'} px-3 py-1 rounded flex items-center justify-center`}
+                        aria-label="Rotate"
+                        title="Rotate"
+                    >
+                        <FaRotate size={18} />
+                    </button>
+                    <button
+                        onClick={() => setTransformMode('scale')}
+                        className={`${transformMode === 'scale' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'} px-3 py-1 rounded flex items-center justify-center`}
+                        aria-label="Scale"
+                        title="Scale"
+                    >
+                        <PiResizeBold size={18} />
+                    </button>
+                </div>
+            )}
 
             {/* Prompt Input */}
             <PromptInput
