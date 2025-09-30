@@ -8,38 +8,43 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const [apiKey, setApiKey] = usePersistedState<string>('gemini-api-key', '');
-  const [localValue, setLocalValue] = useState(apiKey);
+  const [geminiApiKey, setGeminiApiKey] = usePersistedState<string>(
+    'gemini-api-key',
+    ''
+  );
+  const [synexaApiKey, setSynexaApiKey] = usePersistedState<string>(
+    'synexa-api-key',
+    ''
+  );
+  const [localGeminiValue, setLocalGeminiValue] = useState(geminiApiKey);
+  const [localSynexaValue, setLocalSynexaValue] = useState(synexaApiKey);
 
-  // Update local value when modal opens
+  // Update local values when modal opens
   useEffect(() => {
     if (isOpen) {
-      setLocalValue(apiKey);
+      setLocalGeminiValue(geminiApiKey);
+      setLocalSynexaValue(synexaApiKey);
     }
-  }, [isOpen, apiKey]);
+  }, [isOpen, geminiApiKey, synexaApiKey]);
 
   const handleSave = () => {
-    setApiKey(localValue);
+    setGeminiApiKey(localGeminiValue);
+    setSynexaApiKey(localSynexaValue);
     onClose();
   };
 
   const handleCancel = () => {
-    setLocalValue(apiKey);
+    setLocalGeminiValue(geminiApiKey);
+    setLocalSynexaValue(synexaApiKey);
     onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black bg-opacity-50"
-        onClick={handleCancel}
-      />
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       {/* Modal */}
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6 pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
@@ -55,17 +60,33 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="space-y-4">
           <div>
             <label
-              htmlFor="api-key"
+              htmlFor="gemini-api-key"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
               Gemini API Key
             </label>
             <input
-              id="api-key"
+              id="gemini-api-key"
               type="password"
-              value={localValue}
-              onChange={(e) => setLocalValue(e.target.value)}
+              value={localGeminiValue}
+              onChange={(e) => setLocalGeminiValue(e.target.value)}
               placeholder="Enter your Gemini API key"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="synexa-api-key"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              FAL API Key (for 3D generation)
+            </label>
+            <input
+              id="synexa-api-key"
+              type="password"
+              value={localSynexaValue}
+              onChange={(e) => setLocalSynexaValue(e.target.value)}
+              placeholder="Enter your FAL API key"
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>

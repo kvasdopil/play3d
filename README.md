@@ -1,30 +1,49 @@
-# Play3D - 3D Scene Editor
+# Play3D - AI-Powered 3D Model Generator
 
-A modern 3D scene editor built with React, Three.js, and TypeScript. Features an interactive 3D viewport with camera controls, grid system, and settings management.
+An innovative 3D model generation tool built with React, Three.js, and AI. Transform text prompts into 2D images and then into fully textured 3D models, all displayed in an interactive 3D viewport.
 
 ## ✨ Features
 
+### 🤖 AI-Powered Generation
+
+- **Text-to-Image** - Generate images from text prompts using Google Gemini AI
+- **Image-to-3D** - Convert generated images to 3D models using Hunyuan3D (via fal.ai)
+- **Smart prompt enhancement** - Automatically optimizes prompts for better 3D generation
+- **Intelligent caching** - Stores generated images and models in IndexedDB for instant reuse
+- **Global prompt input** - Start typing anywhere to create new models
+
 ### 🎨 3D Viewport
 
-- **Full-screen 3D canvas** powered by Three.js and React Three Fiber
-- **Interactive camera controls** - Drag to rotate around the scene, scroll to zoom in/out
-- **Grid system** - 10cm cell grid on the horizontal plane, visible from both sides
-- **Lighting** - Ambient and directional lighting for realistic rendering
-- **Placeholder objects** - Rotating cube demo at the scene center
+- **Interactive 3D canvas** - Full-screen Three.js viewport powered by React Three Fiber
+- **Orbit controls** - Drag to rotate, scroll to zoom, explore your models from any angle
+- **Grid system** - 10cm cell grid on horizontal plane, visible from both sides
+- **Professional lighting** - Ambient and directional lights for realistic rendering
+- **Auto-loading** - Generated 3D models automatically appear in the scene
+- **Multi-object support** - Display multiple 3D models simultaneously
+- **Persistent scene** - All objects and their transforms saved to IndexedDB
+- **Scene persistence** - Your 3D scene is restored automatically on page reload
+
+### 📦 Modal System
+
+- **Prompt Input Modal** - Clean floating input that appears on keypress
+- **Image Display Modal** - Shows AI-generated images with download option
+- **3D Generation UI** - One-click 3D model generation from images
+- **Model Preview** - Download generated .glb files directly from the modal
+- **No backdrop interference** - Transparent modals that don't obscure the 3D scene
 
 ### ⚙️ Settings Management
 
-- **Settings modal** - Clean UI for application configuration
-- **API Key storage** - Secure Gemini API key storage in browser localStorage
-- **Persistent state** - Custom `usePersistedState` hook for automatic state persistence
-- **Settings button** - Easy access via top-right corner icon
+- **Dual API configuration** - Manage Gemini (image) and fal.ai (3D) API keys
+- **Persistent storage** - API keys saved securely in browser localStorage
+- **Custom hooks** - `usePersistedState` for automatic state persistence
+- **Easy access** - Settings button with gear icon in top-right corner
 
 ### 🛠️ Development Tools
 
-- **Hot Module Replacement (HMR)** - Instant updates during development
-- **ESLint** - Code quality enforcement with TypeScript support
-- **Prettier** - Automatic code formatting
-- **Type safety** - Full TypeScript coverage
+- **Hot Module Replacement** - Instant updates during development
+- **ESLint & Prettier** - Code quality and formatting enforcement
+- **TypeScript** - Full type safety across the entire codebase
+- **Build optimization** - Production-ready builds with Vite
 
 ## 🚀 Tech Stack
 
@@ -38,7 +57,13 @@ A modern 3D scene editor built with React, Three.js, and TypeScript. Features an
 
 - **Three.js** - Powerful 3D graphics library
 - **@react-three/fiber** - React renderer for Three.js
-- **@react-three/drei** - Useful helpers and abstractions (Grid, OrbitControls)
+- **@react-three/drei** - Useful helpers (Grid, OrbitControls, useGLTF)
+
+### AI & Storage
+
+- **@google/genai** - Google Gemini AI for text-to-image generation
+- **@fal-ai/client** - fal.ai client for Hunyuan3D model generation
+- **idb-keyval** - IndexedDB wrapper for caching images and models
 
 ### Styling & UI
 
@@ -96,30 +121,73 @@ npm run format
 ```
 src/
 ├── components/
-│   └── SettingsModal.tsx    # Settings modal component
+│   ├── Model3D.tsx          # 3D model loader component
+│   ├── PromptInput.tsx      # Global prompt input modal
+│   ├── PromptModal.tsx      # Image/model display modal
+│   └── SettingsModal.tsx    # API key settings modal
 ├── hooks/
 │   └── usePersistedState.ts # Custom hook for localStorage persistence
+├── services/
+│   ├── gemini.ts            # Google Gemini AI integration
+│   ├── synexa.ts            # fal.ai Hunyuan3D integration
+│   ├── storage.ts           # IndexedDB caching utilities
+│   └── types.ts             # Shared TypeScript interfaces
 ├── assets/                   # Static assets
 ├── App.tsx                   # Main app component
-├── Scene.tsx                 # 3D scene with canvas and controls
-├── RotatingCube.tsx         # Demo 3D object
+├── Scene.tsx                 # Main 3D scene orchestrator
+├── RotatingCube.tsx         # Placeholder 3D object
 ├── main.tsx                  # App entry point
 └── index.css                 # Global styles with Tailwind
 ```
 
 ## 🎮 Usage
 
-### Camera Controls
+### Quick Start Guide
 
-- **Left-click + drag** - Rotate camera around the center
-- **Scroll wheel** - Zoom in/out
-- **Right-click + drag** - Pan the camera (if enabled)
+1. **Configure API Keys**
+   - Click the settings icon (⚙️) in the top-right corner
+   - Enter your [Google Gemini API key](https://aistudio.google.com/app/apikey)
+   - Enter your [fal.ai API key](https://fal.ai/dashboard/keys)
+   - Click "Save" to persist keys to localStorage
 
-### Settings
+2. **Generate a 3D Model**
+   - Start typing anywhere (e.g., "red sports car")
+   - Press `Enter` to submit the prompt
+   - Wait for the image to generate (shows in modal)
+   - Click "Generate 3D Model" button
+   - Wait for 3D generation to complete (~30-60 seconds)
+   - Model automatically appears in the 3D viewport!
 
-1. Click the settings icon (⚙️) in the top-right corner
-2. Enter your Gemini API key
-3. Click "Save" to persist the key to localStorage
+3. **Explore Your Models**
+   - **Left-click + drag** - Rotate camera around the models
+   - **Scroll wheel** - Zoom in/out
+   - **Close modal** - Model stays in the scene
+   - **Generate new model** - Adds to the scene (no replacement)
+   - **Clear scene** - Click the red trash icon to remove all objects
+   - **Reload page** - Your entire scene is automatically restored!
+
+### Keyboard Shortcuts
+
+- **Any letter/number** - Opens prompt input modal
+- **Enter** - Submit prompt and generate image
+- **Escape** - Close prompt input (without submitting)
+
+### Modal Features
+
+- **Generated Image** - Preview and verify before 3D generation
+- **Download Image** - Save the generated image as PNG
+- **Generate 3D** - One-click conversion to 3D model
+- **Download Model** - Save generated .glb file for use in other tools
+- **Smart Caching** - Same prompt = instant retrieval from IndexedDB
+
+### Scene Persistence
+
+- **Automatic saving** - Scene state saved to IndexedDB whenever objects are added
+- **Full restoration** - Close browser, reboot computer - scene is preserved
+- **Multiple objects** - Build up a collection of models over time
+- **No duplicates** - Same model won't be added twice
+- **Clear anytime** - Red trash icon removes all objects and clears storage
+- **Transform storage** - Position, rotation, and scale saved for each object (ready for future manual editing)
 
 ## 🔧 Configuration
 
@@ -151,6 +219,66 @@ Modify in `src/Scene.tsx`:
   // ... other props
 />
 ```
+
+### AI Generation Settings
+
+**Gemini Image Generation:**
+
+- Prompts are automatically enhanced with: `"Create an image for me: {prompt}. White background, no shadow, top-corner view. No other objects in the image."`
+- This optimization ensures better results for 3D conversion
+- Modify template in `src/Scene.tsx` → `handlePromptSubmit()`
+
+**Hunyuan3D Model Generation:**
+
+- Uses fal.ai's Hunyuan3D v2 API
+- Supports data URLs (base64 images)
+- Default settings: seed=1234, steps=50, guidance=5.5, resolution=256
+- Modify in `src/services/synexa.ts` → `generate3DModel()`
+
+### Storage & Caching
+
+- **Images cached in IndexedDB** - Key format: `image_{hash(prompt)}`
+- **Models cached in IndexedDB** - Key format: `model3d_{hash(prompt)}`
+- **Scene state in IndexedDB** - All objects with transforms persisted automatically
+- **API keys in localStorage** - Keys: `gemini-api-key`, `fal-api-key`
+- Cache persists across sessions for instant reloading
+- Scene is fully restored on page reload with all objects and positions
+
+## 💡 Tips & Best Practices
+
+### For Best Results
+
+1. **Prompt Writing**
+   - Be specific and descriptive (e.g., "blue ceramic coffee mug" vs "mug")
+   - Single objects work better than complex scenes
+   - Mention colors, materials, and style
+
+2. **3D Generation**
+   - Generation takes 30-60 seconds - be patient!
+   - First generation requires model download (may take longer)
+   - Check browser console for progress updates
+   - Models are cached - same prompt = instant reload
+
+3. **Performance**
+   - Complex models may impact viewport performance
+   - Adjust model scale in `Model3D.tsx` if needed (default: 0.1)
+   - Close unused modals to reduce UI overhead
+
+### Known Limitations
+
+- All models are placed at origin (0,0,0) by default - manual positioning coming soon
+- 3D generation requires active internet connection
+- API rate limits apply based on your plan
+- Large models (high detail) may take longer to generate
+- Model quality depends on input image clarity
+- Duplicate models (same URL) are prevented automatically
+
+## 🔐 API Keys & Privacy
+
+- **API keys are stored locally** in your browser's localStorage
+- Keys are never sent to any server except the respective AI services
+- Clear browser data to remove cached keys
+- Keep your API keys secure and never commit them to version control
 
 ## React Compiler
 
