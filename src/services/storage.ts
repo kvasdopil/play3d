@@ -51,9 +51,7 @@ export function generate3DModelId(prompt: string): string {
 }
 
 // Scene objects storage functions
-export async function saveSceneObjects(
-  objects: SceneObject[]
-): Promise<void> {
+export async function saveSceneObjects(objects: SceneObject[]): Promise<void> {
   await set(SCENE_OBJECTS_KEY, objects);
 }
 

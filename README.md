@@ -22,6 +22,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Multi-object support** - Display multiple 3D models simultaneously
 - **Persistent scene** - All objects and their transforms saved to IndexedDB
 - **Scene persistence** - Your 3D scene is restored automatically on page reload
+- **Selection & transforms** - Click to select, Move/Rotate/Scale gizmo, ground snap with 15cm threshold and bottom-face highlight
 
 ### 📦 Modal System
 
@@ -161,6 +162,10 @@ src/
 3. **Explore Your Models**
    - **Left-click + drag** - Rotate camera around the models
    - **Scroll wheel** - Zoom in/out
+   - **Click a model** - Select it and show transform gizmo
+   - **Move/Rotate/Scale** - Use the toolbar on the top-left to change modes
+   - **Drag to move** - Bottom sticks to ground when within 15cm of y=0
+   - **Ground highlight** - Transparent orange bottom face indicates stickiness
    - **Close modal** - Model stays in the scene
    - **Generate new model** - Adds to the scene (no replacement)
    - **Clear scene** - Click the red trash icon to remove all objects
@@ -171,6 +176,7 @@ src/
 - **Any letter/number** - Opens prompt input modal
 - **Enter** - Submit prompt and generate image
 - **Escape** - Close prompt input (without submitting)
+- Coming soon: `W` Move, `E` Rotate, `R` Scale
 
 ### Modal Features
 
@@ -266,7 +272,7 @@ Modify in `src/Scene.tsx`:
 
 ### Known Limitations
 
-- All models are placed at origin (0,0,0) by default - manual positioning coming soon
+- Manual positioning is supported via the transform gizmo (position/rotation/scale). New models are placed at origin by default.
 - 3D generation requires active internet connection
 - API rate limits apply based on your plan
 - Large models (high detail) may take longer to generate
