@@ -23,6 +23,10 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Persistent scene** - All objects and their transforms saved to IndexedDB
 - **Scene persistence** - Your 3D scene is restored automatically on page reload
 - **Selection & transforms** - Click to select, Move/Rotate/Scale gizmo, ground snap with 15cm threshold and bottom-face highlight
+- **Render modes** - Switch between Textured and Solid Color
+- **Solid Color mode** - Unique pastel color per object with crisp mesh lines on top
+- **Persistent render choice** - Render mode toggle (center-top) is saved across reloads
+- **Safer selection** - Hovering/dragging the transform gizmo prevents selecting objects behind it
 
 ### 📦 Modal System
 
@@ -31,6 +35,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **3D Generation UI** - One-click 3D model generation from images
 - **Model Preview** - Download generated .glb files directly from the modal
 - **No backdrop interference** - Transparent modals that don't obscure the 3D scene
+- **History Modal** - Browse previously generated 3D objects from IndexedDB and add them back to the scene
 
 ### ⚙️ Settings Management
 
@@ -125,6 +130,7 @@ src/
 │   ├── Model3D.tsx          # 3D model loader component
 │   ├── PromptInput.tsx      # Global prompt input modal
 │   ├── PromptModal.tsx      # Image/model display modal
+│   ├── HistoryModal.tsx     # History browser for stored 3D objects
 │   └── SettingsModal.tsx    # API key settings modal
 ├── hooks/
 │   └── usePersistedState.ts # Custom hook for localStorage persistence
@@ -168,7 +174,9 @@ src/
    - **Ground highlight** - Transparent orange bottom face indicates stickiness
    - **Close modal** - Model stays in the scene
    - **Generate new model** - Adds to the scene (no replacement)
-   - **Clear scene** - Click the red trash icon to remove all objects
+   - **Delete selected** - Red trash icon (top-right) or `Delete` key removes the currently selected object
+   - **History** - Clock icon (top-right) opens a list of known 3D objects from IndexedDB; click "Add to scene" to insert
+   - **Render mode** - Center-top toggle between Textured and Solid; Solid shows unique pastel fills and mesh lines
    - **Reload page** - Your entire scene is automatically restored!
 
 ### Keyboard Shortcuts
@@ -176,6 +184,7 @@ src/
 - **Any letter/number** - Opens prompt input modal
 - **Enter** - Submit prompt and generate image
 - **Escape** - Close prompt input (without submitting)
+- **Delete** - Remove the currently selected object from the scene
 - Coming soon: `W` Move, `E` Rotate, `R` Scale
 
 ### Modal Features
@@ -192,7 +201,7 @@ src/
 - **Full restoration** - Close browser, reboot computer - scene is preserved
 - **Multiple objects** - Build up a collection of models over time
 - **No duplicates** - Same model won't be added twice
-- **Clear anytime** - Red trash icon removes all objects and clears storage
+- **Edit anytime** - Remove objects individually (trash icon or `Delete` key); changes persist automatically
 - **Transform storage** - Position, rotation, and scale saved for each object (ready for future manual editing)
 
 ## 🔧 Configuration
@@ -249,6 +258,7 @@ Modify in `src/Scene.tsx`:
 - **API keys in localStorage** - Keys: `gemini-api-key`, `fal-api-key`
 - Cache persists across sessions for instant reloading
 - Scene is fully restored on page reload with all objects and positions
+- **History scanning** - History modal scans IndexedDB for entries containing a `modelUrl`
 
 ## 💡 Tips & Best Practices
 
