@@ -32,6 +32,12 @@ import { FaRotate } from 'react-icons/fa6';
 import { PiResizeBold } from 'react-icons/pi';
 import { FaArrowsAlt } from 'react-icons/fa';
 import { usePersistedState } from './hooks/usePersistedState';
+import {
+  EffectComposer,
+  N8AO,
+  HueSaturation,
+  BrightnessContrast,
+} from '@react-three/postprocessing';
 
 // (removed CanvasLogger debug component)
 
@@ -478,21 +484,21 @@ export function Scene() {
         style={{ background: '#d3d3d3' }}
         onPointerMissed={() => setSelectedId(null)}
       >
-        {/* Ambient light for general illumination */}
-
-        {/* Directional light for shadows and depth */}
-        <directionalLight position={[15, 15, 15]} intensity={5} />
-        <directionalLight position={[-15, 15, -15]} intensity={2} />
+        {/* Ambient/Key lights */}
+        <ambientLight intensity={1.0} />
+        <hemisphereLight intensity={0.6} groundColor="#444444" />
+        <directionalLight position={[15, 15, 15]} intensity={4} />
+        <directionalLight position={[-15, 15, -15]} intensity={1.5} />
 
         {/* Grid on horizontal plane (XZ), visible from both sides */}
         <Grid
           args={[10, 10]} // 10m x 10m grid
           cellSize={0.1} // 10cm cells
           cellThickness={1}
-          cellColor="#999"
+          cellColor="#666"
           sectionSize={1} // 1m sections
           sectionThickness={0.5}
-          sectionColor="#666"
+          sectionColor="#333"
           fadeDistance={25}
           fadeStrength={1}
           followCamera={false}
@@ -543,6 +549,27 @@ export function Scene() {
         ) : (
           <RotatingCube />
         )}
+
+        {/* Postprocessing - Ambient Occlusion */}
+        <EffectComposer>
+          <N8AO
+            intensity={3}
+            aoRadius={10}
+            distanceFalloff={0.5}
+            quality="ultra"
+            aoSamples={32}
+            denoiseSamples={2}
+            denoiseRadius={8}
+          />
+          <HueSaturation saturation={0.3} />
+          <BrightnessContrast brightness={0.25} contrast={0.2} />
+          {/* <Bloom
+            intensity={0.2}
+            radius={0.05}
+            luminanceThreshold={0.01}
+            mipmapBlur
+          /> */}
+        </EffectComposer>
 
         {/* Transform controls attached to the selected object */}
         {selectedObject && (
