@@ -19,6 +19,7 @@ export function HistoryModal({ isOpen, onClose, onAddToScene }: HistoryModalProp
         modelUrl: string;
         prompt?: string;
         timestamp?: number;
+        imageData?: string; // base64 image data for thumbnail
     }
 
     const [items, setItems] = useState<HistoryItem[]>([]);
@@ -33,6 +34,8 @@ export function HistoryModal({ isOpen, onClose, onAddToScene }: HistoryModalProp
                 const all = await entries();
                 if (isCancelled) return;
                 const collected: HistoryItem[] = [];
+                // Track latest image per prompt
+                const promptToImage: Record<string, { data: string; timestamp: number }> = {};
                 for (const [key, value] of all) {
                     if (value && typeof value === 'object') {
                         if (Array.isArray(value)) {
@@ -46,6 +49,16 @@ export function HistoryModal({ isOpen, onClose, onAddToScene }: HistoryModalProp
                                         prompt: (v as any).prompt as string | undefined,
                                         timestamp: (v as any).timestamp as number | undefined,
                                     });
+                                } else if (v && typeof v === 'object' && 'data' in v && 'prompt' in v) {
+                                    const prompt = (v as any).prompt as string | undefined;
+                                    const data = (v as any).data as string | undefined;
+                                    const ts = (v as any).timestamp as number | undefined;
+                                    if (prompt && data && typeof ts === 'number') {
+                                        const prev = promptToImage[prompt];
+                                        if (!prev || ts > prev.timestamp) {
+                                            promptToImage[prompt] = { data, timestamp: ts };
+                                        }
+                                    }
                                 }
                             }
                         } else if ('modelUrl' in (value as any)) {
@@ -55,7 +68,23 @@ export function HistoryModal({ isOpen, onClose, onAddToScene }: HistoryModalProp
                                 prompt: (value as any).prompt as string | undefined,
                                 timestamp: (value as any).timestamp as number | undefined,
                             });
+                        } else if ('data' in (value as any) && 'prompt' in (value as any)) {
+                            const prompt = (value as any).prompt as string | undefined;
+                            const data = (value as any).data as string | undefined;
+                            const ts = (value as any).timestamp as number | undefined;
+                            if (prompt && data && typeof ts === 'number') {
+                                const prev = promptToImage[prompt];
+                                if (!prev || ts > prev.timestamp) {
+                                    promptToImage[prompt] = { data, timestamp: ts };
+                                }
+                            }
                         }
+                    }
+                }
+                // Attach thumbnails based on prompt
+                for (const item of collected) {
+                    if (item.prompt && promptToImage[item.prompt]) {
+                        item.imageData = promptToImage[item.prompt].data;
                     }
                 }
                 collected.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
@@ -102,13 +131,26 @@ export function HistoryModal({ isOpen, onClose, onAddToScene }: HistoryModalProp
                                 key={obj.id}
                                 className="border border-gray-200 rounded-md p-3 hover:bg-gray-50 transition-colors"
                             >
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1">
-                                        <p className="text-sm text-gray-900 line-clamp-3 break-words">
-                                            {obj.prompt}
-                                        </p>
-                                        <div className="mt-2 text-xs text-gray-500">
-                                            <span>{new Date(obj.timestamp).toLocaleString()}</span>
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        {obj.imageData ? (
+                                            <img
+                                                src={`data:image/png;base64,${obj.imageData}`}
+                                                alt="Thumbnail"
+                                                className="w-12 h-12 rounded object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded bg-gray-100 border flex items-center justify-center text-xs text-gray-400">
+                                                N/A
+                                            </div>
+                                        )}
+                                        <div className="min-w-0">
+                                            <p className="text-sm text-gray-900 line-clamp-2 break-words">
+                                                {obj.prompt}
+                                            </p>
+                                            <div className="mt-1 text-xs text-gray-500">
+                                                <span>{obj.timestamp ? new Date(obj.timestamp).toLocaleString() : ''}</span>
+                                            </div>
                                         </div>
                                     </div>
                                     <button

@@ -31,9 +31,9 @@ export async function generate3DModel(
       input: {
         input_image_url: imageUrl,
         seed: Math.floor(Math.random() * 10000),
-        num_inference_steps: 50,
+        num_inference_steps: 20,
         guidance_scale: 7.5,
-        octree_resolution: 256,
+        octree_resolution: 96, // 256,
         textured_mesh: true, // Generate textured mesh
       },
       logs: true,
