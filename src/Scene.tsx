@@ -57,10 +57,18 @@ export function Scene() {
         useState<TransformMode>('translate');
     const snapThreshold = 0.15; // meters
     const [renderMode, setRenderMode] = usePersistedState<RenderMode>('render-mode', 'textured');
+    const [isSnapActive, setIsSnapActive] = useState(false);
 
     // Map of scene object id -> 3D group reference
     const objectRefs = useRef<Record<string, Object3D | null>>({});
     const transformControlsRef = useRef<any>(null);
+    const dragStartSnapshotRef = useRef<{
+        position: [number, number, number];
+        rotation: [number, number, number];
+        scale: number;
+    } | null>(null);
+    const skipCommitRef = useRef<boolean>(false);
+    const [controlsReset, setControlsReset] = useState(0);
 
     // Track what changed between renders
     const prevStateRef = useRef({
@@ -189,6 +197,49 @@ export function Scene() {
             } catch { }
         };
     }, [selectedId]);
+
+    // Reset drag/hover/orbit state when selection changes or controls unmount
+    useEffect(() => {
+        setIsTransformHovered(false);
+        setIsTransforming(false);
+        setOrbitEnabled(true);
+        dragStartSnapshotRef.current = null;
+        skipCommitRef.current = false;
+        setIsSnapActive(false);
+        return () => {
+            setIsTransformHovered(false);
+            setIsTransforming(false);
+            setOrbitEnabled(true);
+            dragStartSnapshotRef.current = null;
+            skipCommitRef.current = false;
+            setIsSnapActive(false);
+        };
+    }, [selectedId]);
+
+    // ESC to cancel current transform and restore snapshot
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isTransforming) {
+                e.preventDefault();
+                const id = selectedId;
+                const o = id ? (objectRefs.current[id] ?? null) : null;
+                const snap = dragStartSnapshotRef.current;
+                if (o && snap) {
+                    o.position.set(snap.position[0], snap.position[1], snap.position[2]);
+                    o.rotation.set(snap.rotation[0], snap.rotation[1], snap.rotation[2]);
+                    o.scale.set(snap.scale, snap.scale, snap.scale);
+                }
+                setIsTransforming(false);
+                setOrbitEnabled(true);
+                setIsTransformHovered(false);
+                setIsSnapActive(false);
+                skipCommitRef.current = true; // prevent commit on mouse up
+                setControlsReset((v) => v + 1); // force re-mount of controls
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isTransforming, selectedId]);
 
     const handlePromptSubmit = async () => {
         if (promptValue.trim()) {
@@ -401,10 +452,11 @@ export function Scene() {
                 onPointerMissed={() => setSelectedId(null)}
             >
                 {/* Ambient light for general illumination */}
-                <ambientLight intensity={10.0} />
+
 
                 {/* Directional light for shadows and depth */}
-                <directionalLight position={[5, 5, 5]} intensity={3} />
+                <directionalLight position={[15, 15, 15]} intensity={5} />
+                <directionalLight position={[-15, 15, -15]} intensity={2} />
 
                 {/* Grid on horizontal plane (XZ), visible from both sides */}
                 <Grid
@@ -438,15 +490,12 @@ export function Scene() {
                             rotation={obj.transform.rotation}
                             scale={obj.transform.scale}
                             userData={{ id: obj.id }}
-                            onPointerDown={(e) => {
-                                // Ignore selection while manipulating transform gizmo
+                            onClick={(e) => {
+                                // Ignore selection while manipulating/hovering transform gizmo
                                 if (isTransforming || isTransformHovered) {
                                     return;
                                 }
                                 e.stopPropagation();
-                                // Debug details to verify which object receives the event
-                                // Note: event.object is the intersected child, event.eventObject is this group
-
                                 console.log('[select]', {
                                     id: obj.id,
                                     modelUrl: obj.modelUrl,
@@ -470,28 +519,74 @@ export function Scene() {
                 {/* Transform controls attached to the selected object */}
                 {selectedObject && (
                     <TransformControls
-                        key={selectedId ?? 'none'}
+                        key={`${selectedId ?? 'none'}-${controlsReset}`}
                         object={selectedObject}
                         mode={transformMode}
                         ref={transformControlsRef as unknown as React.RefObject<any>}
                         onChange={() => {
-                            // Snap-to-ground only when close to the plane (<= 0.15m)
+                            // Vertical snapping to ground and other objects' top planes during translation
+                            if (transformMode !== 'translate') return;
                             const id = selectedId;
                             const o = id ? (objectRefs.current[id] ?? null) : null;
                             if (!o) return;
+
                             const aabb = new Box3().setFromObject(o);
-                            const minY = aabb.min.y;
-                            if (Math.abs(minY) <= snapThreshold) {
-                                o.position.y -= minY;
+                            const bottomY = aabb.min.y;
+
+                            // Gather candidate target Y planes: ground (0) and other objects' top faces when XZ overlap
+                            const candidatePlanesY: number[] = [0];
+                            for (const [otherId, otherObj] of Object.entries(objectRefs.current)) {
+                                if (!otherObj || otherId === id) continue;
+                                const otherBox = new Box3().setFromObject(otherObj);
+                                const xOverlap = aabb.max.x > otherBox.min.x && aabb.min.x < otherBox.max.x;
+                                const zOverlap = aabb.max.z > otherBox.min.z && aabb.min.z < otherBox.max.z;
+                                if (xOverlap && zOverlap) {
+                                    candidatePlanesY.push(otherBox.max.y);
+                                }
+                            }
+
+                            // Find best plane within threshold (smallest absolute delta)
+                            let bestDelta = Infinity;
+                            for (const planeY of candidatePlanesY) {
+                                const delta = planeY - bottomY;
+                                if (Math.abs(delta) <= snapThreshold && Math.abs(delta) < Math.abs(bestDelta)) {
+                                    bestDelta = delta;
+                                }
+                            }
+
+                            if (bestDelta !== Infinity) {
+                                o.position.y += bestDelta;
+                                setIsSnapActive(true);
+                            } else {
+                                setIsSnapActive(false);
                             }
                         }}
                         onMouseDown={() => {
                             setOrbitEnabled(false);
                             setIsTransforming(true);
+                            setIsSnapActive(false);
+                            const id = selectedId;
+                            const o = id ? (objectRefs.current[id] ?? null) : null;
+                            if (o) {
+                                dragStartSnapshotRef.current = {
+                                    position: [o.position.x, o.position.y, o.position.z],
+                                    rotation: [o.rotation.x, o.rotation.y, o.rotation.z],
+                                    scale: o.scale.x,
+                                };
+                            } else {
+                                dragStartSnapshotRef.current = null;
+                            }
+                            skipCommitRef.current = false;
                         }}
                         onMouseUp={() => {
                             setOrbitEnabled(true);
                             setIsTransforming(false);
+                            setIsSnapActive(false);
+                            if (skipCommitRef.current) {
+                                // Clear the flag and skip committing the transform
+                                skipCommitRef.current = false;
+                                return;
+                            }
                             const id = selectedId;
                             const o = id ? (objectRefs.current[id] ?? null) : null;
                             if (o && id) {
@@ -527,7 +622,7 @@ export function Scene() {
 
                 {/* Bounding box for selected object */}
                 {selectedObject && (
-                    <SelectionBounds object={selectedObject} threshold={snapThreshold} />
+                    <SelectionBounds object={selectedObject} threshold={snapThreshold} snapActive={isSnapActive} />
                 )}
 
                 {/* Orbit controls for camera rotation and zoom */}
@@ -628,9 +723,11 @@ export function Scene() {
 function SelectionBounds({
     object,
     threshold = 0.15,
+    snapActive,
 }: {
     object: Object3D;
     threshold?: number;
+    snapActive?: boolean;
 }) {
     const groupRef = useRef<Object3D | null>(null);
     const lineRef = useRef<LineSegments | null>(null);
@@ -656,7 +753,7 @@ function SelectionBounds({
         }
         if (bottomPlaneRef.current) {
             bottomPlaneRef.current.scale.set(size.current.x, size.current.z, 1);
-            bottomPlaneRef.current.visible = Math.abs(box.current.min.y) <= threshold;
+            bottomPlaneRef.current.visible = snapActive ? true : Math.abs(box.current.min.y) <= threshold;
             bottomPlaneRef.current.position.set(0, -size.current.y / 2, 0);
         }
     });

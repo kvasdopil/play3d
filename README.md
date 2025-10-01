@@ -22,7 +22,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Multi-object support** - Display multiple 3D models simultaneously
 - **Persistent scene** - All objects and their transforms saved to IndexedDB
 - **Scene persistence** - Your 3D scene is restored automatically on page reload
-- **Selection & transforms** - Click to select, Move/Rotate/Scale gizmo, ground snap with 15cm threshold and bottom-face highlight
+- **Selection & transforms** - Click to select, Move/Rotate/Scale gizmo, snap to ground and to other objects' top faces (15cm threshold) with bottom-face highlight while snapping
 - **Render modes** - Switch between Textured and Solid Color
 - **Solid Color mode** - Unique pastel color per object with crisp mesh lines on top
 - **Persistent render choice** - Render mode toggle (center-top) is saved across reloads
@@ -170,8 +170,8 @@ src/
    - **Scroll wheel** - Zoom in/out
    - **Click a model** - Select it and show transform gizmo
    - **Move/Rotate/Scale** - Use the toolbar on the top-left to change modes
-   - **Drag to move** - Bottom sticks to ground when within 15cm of y=0
-   - **Ground highlight** - Transparent orange bottom face indicates stickiness
+   - **Drag to move** - Bottom snaps to ground or to other objects' top faces when within 15cm
+   - **Snap highlight** - Transparent orange bottom face shows while snapping is active
    - **Close modal** - Model stays in the scene
    - **Generate new model** - Adds to the scene (no replacement)
    - **Delete selected** - Red trash icon (top-right) or `Delete` key removes the currently selected object
@@ -183,7 +183,7 @@ src/
 
 - **Any letter/number** - Opens prompt input modal
 - **Enter** - Submit prompt and generate image
-- **Escape** - Close prompt input (without submitting)
+- **Escape** - Cancel in-progress transform (revert), or close prompt input when not transforming
 - **Delete** - Remove the currently selected object from the scene
 - Coming soon: `W` Move, `E` Rotate, `R` Scale
 
