@@ -17,7 +17,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 ### 🎨 3D Viewport
 
 - **Interactive 3D canvas** - Full-screen Three.js viewport powered by React Three Fiber
-- **Orbit controls** - Drag to rotate, scroll to zoom, explore your models from any angle
+- **Orbit controls** - Drag to rotate; scroll to zoom toward the cursor for precise navigation
 - **Grid system** - 10cm cell grid on horizontal plane, visible from both sides
 - **Professional lighting** - Ambient and directional lights for realistic rendering
 - **Auto-loading** - Generated 3D models automatically appear in the scene
@@ -28,6 +28,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Render modes** - Switch between Textured and Solid Color
 - **Solid Color mode** - Unique pastel color per object with crisp mesh lines on top
 - **Persistent render choice** - Render mode toggle (center-top) is saved across reloads
+- **Camera persistence** - Camera position and orbit target are saved to localStorage and restored on reload
 - **Safer selection** - Hovering/dragging the transform gizmo prevents selecting objects behind it
 
 ### 📦 Modal System
@@ -169,18 +170,19 @@ src/
 
 3. **Explore Your Models**
    - **Left-click + drag** - Rotate camera around the models
-   - **Scroll wheel** - Zoom in/out
-   - **Click a model** - Select it and show transform gizmo
-   - **Move/Rotate/Scale** - Use the toolbar on the top-left to change modes
-   - **Drag to move** - Bottom snaps to ground or to other objects' top faces when within 15cm
-   - **Snap highlight** - Transparent orange bottom face shows while snapping is active
-   - **Close modal** - Model stays in the scene
-   - **Generate new model** - Adds to the scene (no replacement)
-   - **Delete selected** - Red trash icon (top-right) or `Delete` key removes the currently selected object
-   - **History** - Clock icon (top-right) opens a list of known 3D objects from IndexedDB with thumbnails; click "Add to scene" to insert
-   - **New prompt** - + button (top-left) opens the prompt input anytime when not editing/transforming
-   - **Render mode** - Center-top toggle between Textured and Solid; Solid shows unique pastel fills and mesh lines
-   - **Reload page** - Your entire scene is automatically restored!
+
+- **Scroll wheel** - Zoom in/out toward the cursor
+  - **Click a model** - Select it and show transform gizmo
+  - **Move/Rotate/Scale** - Use the toolbar on the top-left to change modes
+  - **Drag to move** - Bottom snaps to ground or to other objects' top faces when within 15cm
+  - **Snap highlight** - Transparent orange bottom face shows while snapping is active
+  - **Close modal** - Model stays in the scene
+  - **Generate new model** - Adds to the scene (no replacement)
+  - **Delete selected** - Red trash icon (top-right) or `Delete` key removes the currently selected object
+  - **History** - Clock icon (top-right) opens a list of known 3D objects from IndexedDB with thumbnails; click "Add to scene" to insert
+  - **New prompt** - + button (top-left) opens the prompt input anytime when not editing/transforming
+  - **Render mode** - Center-top toggle between Textured and Solid; Solid shows unique pastel fills and mesh lines
+  - **Reload page** - Your entire scene is automatically restored!
 
 ### Keyboard Shortcuts
 
@@ -221,6 +223,12 @@ camera={{
   position: [1, 1, 1], // in meters
   fov: 50,
 }}
+```
+
+Camera position and the `OrbitControls.target` are automatically saved to `localStorage` under the key `camera-state` and restored on reload. To reset the camera back to defaults, run this in the browser console:
+
+```js
+localStorage.removeItem('camera-state');
 ```
 
 ### Grid Settings
