@@ -2,7 +2,16 @@ import { useEffect, useState, memo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import type { GLTF } from 'three-stdlib';
 import type { Transform } from '../services/types';
-import { Box3, Vector3, MeshBasicMaterial, Color } from 'three';
+import {
+  Box3,
+  Vector3,
+  MeshBasicMaterial,
+  Color,
+  Mesh,
+  WebGLRenderer,
+  Scene as ThreeScene,
+  Camera,
+} from 'three';
 
 interface Model3DProps {
   modelUrl: string;
@@ -12,7 +21,12 @@ interface Model3DProps {
 }
 
 export const Model3D = memo(
-  function Model3D({ modelUrl, transform, renderMode = 'textured', colorHex }: Model3DProps) {
+  function Model3D({
+    modelUrl,
+    transform,
+    renderMode = 'textured',
+    colorHex,
+  }: Model3DProps) {
     const [localUrl, setLocalUrl] = useState<string | null>(null);
 
     useEffect(() => {
@@ -54,7 +68,14 @@ export const Model3D = memo(
       return null;
     }
 
-    return <LoadedModel url={localUrl} transform={transform} renderMode={renderMode} colorHex={colorHex} />;
+    return (
+      <LoadedModel
+        url={localUrl}
+        transform={transform}
+        renderMode={renderMode}
+        colorHex={colorHex}
+      />
+    );
   },
   (prevProps, nextProps) => {
     // Re-render if modelUrl or renderMode/color changes
@@ -111,63 +132,124 @@ const LoadedModel = memo(
       // Prepare a single solid material per model instance (unlit, fast)
       const solidMaterial: MeshBasicMaterial =
         scene.userData.__solidMaterialGlobal ||
-        new MeshBasicMaterial({ color: new Color(colorHex ?? '#cccccc'), toneMapped: false });
+        new MeshBasicMaterial({
+          color: new Color(colorHex ?? '#cccccc'),
+          toneMapped: false,
+        });
       solidMaterial.color.set(colorHex ?? '#cccccc');
       // Ensure no textures/maps
-      (solidMaterial as any).map = null;
-      (solidMaterial as any).alphaMap = null;
-      (solidMaterial as any).aoMap = null;
-      (solidMaterial as any).envMap = null;
-      (solidMaterial as any).lightMap = null;
-      (solidMaterial as any).needsUpdate = true;
+      solidMaterial.map = null;
+      solidMaterial.alphaMap = null;
+      solidMaterial.aoMap = null;
+      solidMaterial.envMap = null;
+      solidMaterial.lightMap = null;
+      solidMaterial.needsUpdate = true;
       scene.userData.__solidMaterialGlobal = solidMaterial;
 
       if (renderMode === 'solid') {
-        scene.traverse((node: any) => {
-          if (!node.isMesh) return;
+        scene.traverse((node) => {
+          const n = node as Mesh;
+          if (!n || (n as unknown as { isMesh?: boolean }).isMesh !== true)
+            return;
           // Save original once
-          if (!node.userData.__originalMaterial) {
-            node.userData.__originalMaterial = node.material;
+          if (!n.userData.__originalMaterial) {
+            (n.userData as Record<string, unknown>).__originalMaterial =
+              n.material;
           }
           // Assign shared solid material per model
-          node.material = solidMaterial;
+          n.material = solidMaterial;
 
           // Setup lightweight wireframe overlay pass using onAfterRender
-          if (!node.userData.__wireframeApplied) {
-            const wf: MeshBasicMaterial = (scene.userData.__sharedWireframeMaterial ||= new MeshBasicMaterial({
-              color: new Color('#000000'),
-              wireframe: true,
-              depthTest: true,
-              depthWrite: false,
-              polygonOffset: true,
-              polygonOffsetFactor: -1,
-              polygonOffsetUnits: -1,
-            }));
-            node.userData.__originalOnAfterRender = node.onAfterRender;
-            node.onAfterRender = (renderer: any, sceneArg: any, camera: any) => {
-              const baseMat = node.material;
+          if (!(n.userData as Record<string, unknown>).__wireframeApplied) {
+            const wf: MeshBasicMaterial =
+              (scene.userData.__sharedWireframeMaterial ||=
+                new MeshBasicMaterial({
+                  color: new Color('#000000'),
+                  wireframe: true,
+                  depthTest: true,
+                  depthWrite: false,
+                  polygonOffset: true,
+                  polygonOffsetFactor: -1,
+                  polygonOffsetUnits: -1,
+                }));
+            (n.userData as Record<string, unknown>).__originalOnAfterRender =
+              n.onAfterRender;
+            n.onAfterRender = (
+              renderer: WebGLRenderer,
+              sceneArg: ThreeScene,
+              camera: Camera,
+              geometry: any,
+              material: any,
+              group: any
+            ) => {
+              const baseMat = n.material;
               // draw overlay AFTER the normal draw so it appears on top
-              node.material = wf;
-              renderer.renderBufferDirect(camera, null, node.geometry, wf, node, null);
-              node.material = baseMat;
-              if (node.userData.__originalOnAfterRender) {
-                node.userData.__originalOnAfterRender(renderer, sceneArg, camera);
+              n.material = wf;
+              renderer.renderBufferDirect(
+                camera,
+                sceneArg,
+                n.geometry,
+                wf,
+                n,
+                null
+              );
+              n.material = baseMat;
+              const original = (n.userData as Record<string, unknown>)
+                .__originalOnAfterRender as
+                | ((
+                    renderer: WebGLRenderer,
+                    scene: ThreeScene,
+                    camera: Camera,
+                    geometry: any,
+                    material: any,
+                    group: any
+                  ) => void)
+                | undefined;
+              if (original) {
+                original(renderer, sceneArg, camera, geometry, material, group);
               }
             };
-            node.userData.__wireframeApplied = true;
+            (n.userData as Record<string, unknown>).__wireframeApplied = true;
           }
         });
       } else {
         // Restore original materials and remove edges
-        scene.traverse((node: any) => {
-          if (!node.isMesh) return;
-          if (node.userData.__originalMaterial) {
-            node.material = node.userData.__originalMaterial;
+        scene.traverse((node) => {
+          const n = node as Mesh;
+          if (!n || (n as unknown as { isMesh?: boolean }).isMesh !== true)
+            return;
+          const originalMat = (n.userData as Record<string, unknown>)
+            .__originalMaterial as MeshBasicMaterial | undefined;
+          if (originalMat) {
+            n.material = originalMat;
           }
-          if (node.userData.__wireframeApplied) {
-            node.onAfterRender = node.userData.__originalOnAfterRender || undefined;
-            node.userData.__wireframeApplied = false;
-            node.userData.__originalOnAfterRender = undefined;
+          if ((n.userData as Record<string, unknown>).__wireframeApplied) {
+            const original = (n.userData as Record<string, unknown>)
+              .__originalOnAfterRender as
+              | ((
+                  renderer: WebGLRenderer,
+                  scene: ThreeScene,
+                  camera: Camera,
+                  geometry: any,
+                  material: any,
+                  group: any
+                ) => void)
+              | undefined;
+            n.onAfterRender = (
+              renderer: WebGLRenderer,
+              sceneArg: ThreeScene,
+              camera: Camera,
+              geometry: any,
+              material: any,
+              group: any
+            ) => {
+              if (original) {
+                original(renderer, sceneArg, camera, geometry, material, group);
+              }
+            };
+            (n.userData as Record<string, unknown>).__wireframeApplied = false;
+            (n.userData as Record<string, unknown>).__originalOnAfterRender =
+              undefined;
           }
         });
       }

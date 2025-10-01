@@ -29,8 +29,6 @@ export function PromptModal({
   onGenerate3D,
   onUpdatePrompt,
 }: PromptModalProps) {
-  if (!isOpen) return null;
-
   const [isEditing, setIsEditing] = useState(false);
   const [editedPrompt, setEditedPrompt] = useState(prompt);
   const hasChanges = editedPrompt.trim() !== prompt.trim();
@@ -42,6 +40,8 @@ export function PromptModal({
       setEditedPrompt(prompt);
     }
   }, [prompt, isEditing]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -98,10 +98,11 @@ export function PromptModal({
                     }
                   }}
                   disabled={!hasChanges || isUpdating}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${hasChanges && !isUpdating
-                    ? 'text-white bg-indigo-600 hover:bg-indigo-700'
-                    : 'text-gray-400 bg-gray-100 cursor-not-allowed'
-                    }`}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    hasChanges && !isUpdating
+                      ? 'text-white bg-indigo-600 hover:bg-indigo-700'
+                      : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                  }`}
                 >
                   {isUpdating ? 'Updating…' : 'Update'}
                 </button>

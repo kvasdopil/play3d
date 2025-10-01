@@ -11,8 +11,8 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Smart prompt enhancement** - Automatically optimizes prompts for better 3D generation
 - **Intelligent caching** - Stores generated images and models in IndexedDB for instant reuse
 - **Global prompt input** - Start typing anywhere to create new models
- - **Inline prompt editing** - Edit the prompt directly in the modal and regenerate the image in-place
- - **Background progress indicator** - Bottom-left status button with spinner, thumbnail, and prompt while 3D is generating
+- **Inline prompt editing** - Edit the prompt directly in the modal and regenerate the image in-place
+- **Background progress indicator** - Bottom-left status button with spinner, thumbnail, and prompt while 3D is generating
 
 ### 🎨 3D Viewport
 
@@ -263,7 +263,7 @@ Modify in `src/Scene.tsx`:
 - Cache persists across sessions for instant reloading
 - Scene is fully restored on page reload with all objects and positions
 - **History scanning** - History modal scans IndexedDB for entries containing a `modelUrl`
- 
+
 ### Prompt Editing Behavior
 
 - Click the light gray edit icon next to the prompt to enter edit mode
