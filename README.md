@@ -11,6 +11,8 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Smart prompt enhancement** - Automatically optimizes prompts for better 3D generation
 - **Intelligent caching** - Stores generated images and models in IndexedDB for instant reuse
 - **Global prompt input** - Start typing anywhere to create new models
+ - **Inline prompt editing** - Edit the prompt directly in the modal and regenerate the image in-place
+ - **Background progress indicator** - Bottom-left status button with spinner, thumbnail, and prompt while 3D is generating
 
 ### 🎨 3D Viewport
 
@@ -35,7 +37,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **3D Generation UI** - One-click 3D model generation from images
 - **Model Preview** - Download generated .glb files directly from the modal
 - **No backdrop interference** - Transparent modals that don't obscure the 3D scene
-- **History Modal** - Browse previously generated 3D objects from IndexedDB and add them back to the scene
+- **History Modal** - Browse previously generated 3D objects (with thumbnails) from IndexedDB and add them back to the scene
 
 ### ⚙️ Settings Management
 
@@ -158,12 +160,12 @@ src/
    - Click "Save" to persist keys to localStorage
 
 2. **Generate a 3D Model**
-   - Start typing anywhere (e.g., "red sports car")
+   - Start typing anywhere (e.g., "red sports car") or click the + button (top-left) to open the prompt box
    - Press `Enter` to submit the prompt
    - Wait for the image to generate (shows in modal)
-   - Click "Generate 3D Model" button
-   - Wait for 3D generation to complete (~30-60 seconds)
-   - Model automatically appears in the 3D viewport!
+   - Optionally click the small edit icon next to the prompt to tweak it and press Update to regenerate the image without closing the modal
+   - Click "Generate 3D Model" button; the modal closes and a bottom-left button shows progress (spinner + thumbnail + prompt)
+   - When generation finishes, the progress button disappears and the model automatically appears in the 3D viewport
 
 3. **Explore Your Models**
    - **Left-click + drag** - Rotate camera around the models
@@ -175,7 +177,8 @@ src/
    - **Close modal** - Model stays in the scene
    - **Generate new model** - Adds to the scene (no replacement)
    - **Delete selected** - Red trash icon (top-right) or `Delete` key removes the currently selected object
-   - **History** - Clock icon (top-right) opens a list of known 3D objects from IndexedDB; click "Add to scene" to insert
+   - **History** - Clock icon (top-right) opens a list of known 3D objects from IndexedDB with thumbnails; click "Add to scene" to insert
+   - **New prompt** - + button (top-left) opens the prompt input anytime when not editing/transforming
    - **Render mode** - Center-top toggle between Textured and Solid; Solid shows unique pastel fills and mesh lines
    - **Reload page** - Your entire scene is automatically restored!
 
@@ -191,9 +194,10 @@ src/
 
 - **Generated Image** - Preview and verify before 3D generation
 - **Download Image** - Save the generated image as PNG
-- **Generate 3D** - One-click conversion to 3D model
+- **Generate 3D** - One-click conversion to 3D model (closes modal and shows bottom-left progress until done)
 - **Download Model** - Save generated .glb file for use in other tools
 - **Smart Caching** - Same prompt = instant retrieval from IndexedDB
+- **Inline Edit** - Click the light gray edit icon next to the prompt to edit; press Update to regenerate the image in-place (the textarea turns back into normal text immediately)
 
 ### Scene Persistence
 
@@ -247,7 +251,7 @@ Modify in `src/Scene.tsx`:
 
 - Uses fal.ai's Hunyuan3D v2 API
 - Supports data URLs (base64 images)
-- Default settings: seed=1234, steps=50, guidance=5.5, resolution=256
+- Default settings (as configured): random seed, steps=20, guidance=7.5, octree resolution=96, textured mesh enabled
 - Modify in `src/services/synexa.ts` → `generate3DModel()`
 
 ### Storage & Caching
@@ -255,10 +259,16 @@ Modify in `src/Scene.tsx`:
 - **Images cached in IndexedDB** - Key format: `image_{hash(prompt)}`
 - **Models cached in IndexedDB** - Key format: `model3d_{hash(prompt)}`
 - **Scene state in IndexedDB** - All objects with transforms persisted automatically
-- **API keys in localStorage** - Keys: `gemini-api-key`, `fal-api-key`
+- **API keys in localStorage** - Keys: `gemini-api-key`, `synexa-api-key`
 - Cache persists across sessions for instant reloading
 - Scene is fully restored on page reload with all objects and positions
 - **History scanning** - History modal scans IndexedDB for entries containing a `modelUrl`
+ 
+### Prompt Editing Behavior
+
+- Click the light gray edit icon next to the prompt to enter edit mode
+- Update becomes enabled when the text changes; clicking Update immediately switches back to normal text and regenerates the image in-place
+- If you unfocus the textarea without changes, it exits edit mode; with changes, stay and press Update to apply
 
 ## 💡 Tips & Best Practices
 

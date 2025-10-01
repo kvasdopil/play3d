@@ -1,4 +1,6 @@
 import { IoClose } from 'react-icons/io5';
+import { useEffect, useState } from 'react';
+import { MdEdit } from 'react-icons/md';
 
 interface PromptModalProps {
   isOpen: boolean;
@@ -11,6 +13,7 @@ interface PromptModalProps {
   error3D?: string;
   onClose: () => void;
   onGenerate3D?: () => void;
+  onUpdatePrompt?: (newPrompt: string) => void | Promise<void>;
 }
 
 export function PromptModal({
@@ -24,8 +27,21 @@ export function PromptModal({
   error3D,
   onClose,
   onGenerate3D,
+  onUpdatePrompt,
 }: PromptModalProps) {
   if (!isOpen) return null;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedPrompt, setEditedPrompt] = useState(prompt);
+  const hasChanges = editedPrompt.trim() !== prompt.trim();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    // When prompt prop changes or modal opens, sync local state if not actively editing
+    if (!isEditing) {
+      setEditedPrompt(prompt);
+    }
+  }, [prompt, isEditing]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -41,6 +57,57 @@ export function PromptModal({
 
         {/* Content */}
         <div className="pr-8 space-y-6">
+          {/* Prompt editable header */}
+          <div className="flex items-start gap-2">
+            {!isEditing ? (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <p className="text-lg text-gray-800 break-words">{prompt}</p>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Edit prompt"
+                  title="Edit"
+                >
+                  <MdEdit size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                <textarea
+                  value={editedPrompt}
+                  onChange={(e) => setEditedPrompt(e.target.value)}
+                  onBlur={() => {
+                    if (!hasChanges) {
+                      setIsEditing(false);
+                    }
+                  }}
+                  rows={3}
+                  className="flex-1 border border-gray-300 rounded-md p-2 text-base text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  onClick={async () => {
+                    if (hasChanges && onUpdatePrompt) {
+                      // Immediately return to view mode
+                      setIsEditing(false);
+                      try {
+                        setIsUpdating(true);
+                        await onUpdatePrompt(editedPrompt.trim());
+                      } finally {
+                        setIsUpdating(false);
+                      }
+                    }
+                  }}
+                  disabled={!hasChanges || isUpdating}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${hasChanges && !isUpdating
+                    ? 'text-white bg-indigo-600 hover:bg-indigo-700'
+                    : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                    }`}
+                >
+                  {isUpdating ? 'Updating…' : 'Update'}
+                </button>
+              </div>
+            )}
+          </div>
           {/* Loading state */}
           {isLoading && (
             <div className="flex items-center justify-center py-12">
@@ -104,10 +171,7 @@ export function PromptModal({
             </div>
           )}
 
-          {/* Prompt text */}
-          <div className="pt-2">
-            <p className="text-lg text-gray-800">{prompt}</p>
-          </div>
+          {/* (Prompt is displayed/edited in header above) */}
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { OrbitControls, Grid, TransformControls } from '@react-three/drei';
 import type { Object3D, LineSegments, Mesh } from 'three';
 import { Box3, Vector3, BoxGeometry } from 'three';
 import { IoSettingsSharp, IoTrashSharp, IoTimeOutline } from 'react-icons/io5';
+import { IoAdd } from 'react-icons/io5';
 import { RotatingCube } from './RotatingCube';
 import { SettingsModal } from './components/SettingsModal';
 import { PromptInput } from './components/PromptInput';
@@ -667,6 +668,20 @@ export function Scene() {
                 </div>
             )}
 
+            {/* Plus button to open prompt input (visible when not editing) */}
+            {!selectedId && !isTransforming && !isPromptInputOpen && !isPromptModalOpen && !isSettingsOpen && !isHistoryOpen && (
+                <div className="absolute top-4 left-4 z-10">
+                    <button
+                        onClick={() => setIsPromptInputOpen(true)}
+                        className="p-3 bg-white/90 hover:bg-white rounded-lg shadow-lg transition-all hover:shadow-xl"
+                        aria-label="New prompt"
+                        title="New prompt"
+                    >
+                        <IoAdd size={24} className="text-gray-700" />
+                    </button>
+                </div>
+            )}
+
             {/* Render mode toggle */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-white/90 rounded-lg shadow-lg px-2 py-1 flex items-center gap-2">
                 <button
@@ -704,6 +719,44 @@ export function Scene() {
                 error3D={error3D}
                 onClose={handleModalClose}
                 onGenerate3D={handleGenerate3D}
+                onUpdatePrompt={async (newPrompt) => {
+                    const trimmed = newPrompt.trim();
+                    if (!trimmed) return;
+                    // Update prompt and regenerate image without closing modal
+                    setSubmittedPrompt(trimmed);
+                    setGeneratedImageData(undefined);
+                    setImageError(undefined);
+                    setIsGeneratingImage(true);
+                    try {
+                        const apiKey = localStorage.getItem('gemini-api-key');
+                        if (!apiKey) {
+                            throw new Error('Please set your Gemini API key in settings');
+                        }
+                        const enhancedPrompt = `Create an image for me: ${trimmed}. White background, no shadow, top-corner view. No other objects in the image.`;
+                        const imageId = generateImageId(trimmed);
+                        const cachedImage = await getGeneratedImage(imageId);
+                        if (cachedImage) {
+                            setGeneratedImageData(cachedImage.data);
+                        } else {
+                            const generatedImage = await generateImage(
+                                enhancedPrompt,
+                                JSON.parse(apiKey)
+                            );
+                            await saveGeneratedImage(imageId, {
+                                ...generatedImage,
+                                prompt: trimmed,
+                            });
+                            setGeneratedImageData(generatedImage.data);
+                        }
+                    } catch (error) {
+                        console.error('Error generating image:', error);
+                        setImageError(
+                            error instanceof Error ? error.message : 'Failed to generate image'
+                        );
+                    } finally {
+                        setIsGeneratingImage(false);
+                    }
+                }}
             />
 
             {/* Settings Modal */}
