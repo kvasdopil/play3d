@@ -1,10 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import {
-  OrbitControls,
-  Grid,
-  TransformControls,
-} from '@react-three/drei';
+import { OrbitControls, Grid, TransformControls } from '@react-three/drei';
 import type { Object3D } from 'three';
 import type {
   OrbitControls as ThreeOrbitControls,
@@ -48,6 +44,7 @@ import { SyncCameraOnModeChange } from './components/scene/SyncCameraOnModeChang
 import { PersistCamera } from './components/scene/PersistCamera';
 import { CursorWheelZoom } from './components/scene/CursorWheelZoom';
 import { SelectionBounds } from './components/scene/SelectionBounds';
+import { IsoDragRotate } from './components/scene/IsoDragRotate';
 
 // (removed CanvasLogger debug component)
 
@@ -111,7 +108,9 @@ export function Scene() {
   const [controlsReset, setControlsReset] = useState(0);
   // Group move support
   const carriedIdsRef = useRef<Set<string>>(new Set());
-  const groupStartPositionsRef = useRef<Record<string, [number, number, number]>>({});
+  const groupStartPositionsRef = useRef<
+    Record<string, [number, number, number]>
+  >({});
   const rootStartPosRef = useRef<Vector3 | null>(null);
 
   // Track what changed between renders
@@ -205,7 +204,7 @@ export function Scene() {
       ) {
         e.preventDefault();
         setIsoIndex((prev) => {
-          const next = e.key === 'ArrowLeft' ? (prev + 1) % 4 : (prev + 3) % 4;
+          const next = e.key === 'ArrowLeft' ? (prev + 1) % 8 : (prev + 7) % 8;
           return next;
         });
         return;
@@ -564,10 +563,10 @@ export function Scene() {
           isoIndex={isoIndex}
         />
         {/* Ambient/Key lights */}
-        <ambientLight intensity={1.0} />
-        <hemisphereLight intensity={0.6} groundColor="#444444" />
-        <directionalLight position={[15, 15, 15]} intensity={4} />
-        <directionalLight position={[-15, 15, -15]} intensity={1.5} />
+        <ambientLight intensity={0.0} />
+        <hemisphereLight intensity={0.5} groundColor="#444444" />
+        <directionalLight position={[15, 15, 15]} intensity={3.0} />
+        <directionalLight position={[-15, 15, -15]} intensity={1.0} />
 
         {/* Grid on horizontal plane (XZ), visible from both sides */}
         <Grid
@@ -632,8 +631,8 @@ export function Scene() {
         {/* Postprocessing - Ambient Occlusion */}
         <EffectComposer>
           <N8AO
-            intensity={3}
-            aoRadius={10}
+            intensity={8}
+            aoRadius={3}
             distanceFalloff={0.5}
             quality="ultra"
             aoSamples={32}
@@ -641,7 +640,7 @@ export function Scene() {
             denoiseRadius={8}
           />
           <HueSaturation saturation={0.1} />
-          <BrightnessContrast brightness={0.1} contrast={0.1} />
+          <BrightnessContrast brightness={0.2} contrast={0.2} />
           {/* <Bloom
             intensity={0.2}
             radius={0.05}
@@ -710,7 +709,11 @@ export function Scene() {
                   const co = objectRefs.current[cid] ?? null;
                   const start = groupStartPositionsRef.current[cid];
                   if (co && start) {
-                    co.position.set(start[0] + delta.x, start[1] + delta.y, start[2] + delta.z);
+                    co.position.set(
+                      start[0] + delta.x,
+                      start[1] + delta.y,
+                      start[2] + delta.z
+                    );
                   }
                 }
               }
@@ -730,17 +733,25 @@ export function Scene() {
                 // Prepare grouped carry data for translate mode
                 if (transformMode === 'translate' && id) {
                   // Helper to find all objects stacked on top (recursively)
-                  const collectStackAbove = (baseId: string, acc: Set<string>) => {
+                  const collectStackAbove = (
+                    baseId: string,
+                    acc: Set<string>
+                  ) => {
                     const baseObj = objectRefs.current[baseId] ?? null;
                     if (!baseObj) return;
                     const baseBox = new Box3().setFromObject(baseObj);
                     const baseTopY = baseBox.max.y;
-                    for (const [oid, obj] of Object.entries(objectRefs.current)) {
+                    for (const [oid, obj] of Object.entries(
+                      objectRefs.current
+                    )) {
                       if (!obj || oid === baseId || acc.has(oid)) continue;
                       const box = new Box3().setFromObject(obj);
-                      const xOverlap = baseBox.max.x > box.min.x && baseBox.min.x < box.max.x;
-                      const zOverlap = baseBox.max.z > box.min.z && baseBox.min.z < box.max.z;
-                      const restingOnTop = Math.abs(box.min.y - baseTopY) <= snapThreshold;
+                      const xOverlap =
+                        baseBox.max.x > box.min.x && baseBox.min.x < box.max.x;
+                      const zOverlap =
+                        baseBox.max.z > box.min.z && baseBox.min.z < box.max.z;
+                      const restingOnTop =
+                        Math.abs(box.min.y - baseTopY) <= snapThreshold;
                       if (xOverlap && zOverlap && restingOnTop) {
                         acc.add(oid);
                         collectStackAbove(oid, acc);
@@ -755,7 +766,11 @@ export function Scene() {
                   for (const cid of group) {
                     const co = objectRefs.current[cid] ?? null;
                     if (co) {
-                      groupStartPositionsRef.current[cid] = [co.position.x, co.position.y, co.position.z];
+                      groupStartPositionsRef.current[cid] = [
+                        co.position.x,
+                        co.position.y,
+                        co.position.z,
+                      ];
                     }
                   }
                   rootStartPosRef.current = o.position.clone();
@@ -798,8 +813,16 @@ export function Scene() {
                       return {
                         ...p,
                         transform: {
-                          position: [refObj.position.x, refObj.position.y, refObj.position.z],
-                          rotation: [refObj.rotation.x, refObj.rotation.y, refObj.rotation.z],
+                          position: [
+                            refObj.position.x,
+                            refObj.position.y,
+                            refObj.position.z,
+                          ],
+                          rotation: [
+                            refObj.rotation.x,
+                            refObj.rotation.y,
+                            refObj.rotation.z,
+                          ],
                           scale: refObj.scale.x,
                         },
                       };
@@ -809,7 +832,11 @@ export function Scene() {
                       return {
                         ...p,
                         transform: {
-                          position: [refObj.position.x, refObj.position.y, refObj.position.z],
+                          position: [
+                            refObj.position.x,
+                            refObj.position.y,
+                            refObj.position.z,
+                          ],
                           rotation: p.transform.rotation,
                           scale: p.transform.scale,
                         },
@@ -844,12 +871,23 @@ export function Scene() {
           enabled={orbitEnabled}
           enableZoom={cameraMode === 'isometric'}
           enableRotate={cameraMode !== 'isometric'}
+          enablePan={cameraMode !== 'isometric'}
         />
 
         {/* Custom cursor-centered zoom handler */}
         <CursorWheelZoom
           controlsRef={orbitControlsRef}
           enabled={orbitEnabled && cameraMode === 'perspective'}
+        />
+        {/* Map horizontal drags to iso view steps when in isometric and not transforming */}
+        <IsoDragRotate
+          enabled={
+            orbitEnabled &&
+            cameraMode === 'isometric' &&
+            !isTransforming &&
+            !isTransformHovered
+          }
+          onSetIndex={(index) => setIsoIndex(index % 8)}
         />
         {/* Persist camera position and orbit target across reloads */}
         <PersistCamera controlsRef={orbitControlsRef} />
@@ -937,14 +975,14 @@ export function Scene() {
           {cameraMode === 'isometric' && (
             <div className="flex">
               <button
-                onClick={() => setIsoIndex((v) => (v + 1) % 4)}
+                onClick={() => setIsoIndex((v) => (v + 1) % 8)}
                 className="px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
                 title="Rotate left (←)"
               >
                 ←
               </button>
               <button
-                onClick={() => setIsoIndex((v) => (v + 3) % 4)}
+                onClick={() => setIsoIndex((v) => (v + 7) % 8)}
                 className="px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 rounded-r"
                 title="Rotate right (→)"
               >

@@ -31,7 +31,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Camera persistence** - Camera position and orbit target are saved to localStorage and restored on reload
 - **Safer selection** - Hovering/dragging the transform gizmo prevents selecting objects behind it
 - **Isometric camera** - Orthographic isometric view with classic tilt; toggle Persp/Iso (center-top)
-- **Isometric rotation** - In Iso mode, ArrowLeft rotates CCW and ArrowRight rotates CW across 4 corners; tiny arrows in UI do the same
+- **Isometric rotation** - In Iso mode, ArrowLeft rotates CCW and ArrowRight rotates CW across 8 views (4 classic corners plus top-left, top-right, top-front, top-back); tiny arrows in UI do the same
 - **Animated transitions** - Smooth camera lerp between Persp↔Iso and between Iso corners
 - **Zoom behavior** - Cursor-centered zoom in Persp; standard wheel zoom in Iso (rotation disabled in Iso)
 - **Stack-carry movement** - When moving an object, any objects resting on top of it are carried along (15cm snap tolerance)
@@ -235,7 +235,7 @@ Persistence keys in `localStorage`:
 
 - `camera-state` - camera position and orbit target
 - `camera-mode` - `perspective` | `isometric`
-- `iso-view-index` - isometric corner index (0..3)
+- `iso-view-index` - isometric view index (0..7)
 
 Reset to defaults (browser console):
 
