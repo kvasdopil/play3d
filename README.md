@@ -30,6 +30,10 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Persistent render choice** - Render mode toggle (center-top) is saved across reloads
 - **Camera persistence** - Camera position and orbit target are saved to localStorage and restored on reload
 - **Safer selection** - Hovering/dragging the transform gizmo prevents selecting objects behind it
+ - **Isometric camera** - Orthographic isometric view with classic tilt; toggle Persp/Iso (center-top)
+ - **Isometric rotation** - In Iso mode, ArrowLeft rotates CCW and ArrowRight rotates CW across 4 corners; tiny arrows in UI do the same
+ - **Animated transitions** - Smooth camera lerp between Persp↔Iso and between Iso corners
+ - **Zoom behavior** - Cursor-centered zoom in Persp; standard wheel zoom in Iso (rotation disabled in Iso)
 
 ### 📦 Modal System
 
@@ -190,6 +194,7 @@ src/
 - **Enter** - Submit prompt and generate image
 - **Escape** - Cancel in-progress transform (revert), or close prompt input when not transforming
 - **Delete** - Remove the currently selected object from the scene
+- **ArrowLeft / ArrowRight** - In isometric mode, rotate the camera CCW/CW (when no text field is focused)
 - Coming soon: `W` Move, `E` Rotate, `R` Scale
 
 ### Modal Features
@@ -214,21 +219,24 @@ src/
 
 ### Camera Settings
 
-Default camera position: `(100cm, 100cm, 100cm)` looking at origin `(0, 0, 0)`
+Defaults:
 
-Modify in `src/Scene.tsx`:
+- Perspective: initial position `(1, 1, 1)`, `fov=50`
+- Isometric: orthographic projection (~35.264° tilt, 45° yaw), four corner views
+- Toggle: Center-top buttons `Persp` and `Iso` (with small arrows in Iso)
 
-```tsx
-camera={{
-  position: [1, 1, 1], // in meters
-  fov: 50,
-}}
-```
+Persistence keys in `localStorage`:
 
-Camera position and the `OrbitControls.target` are automatically saved to `localStorage` under the key `camera-state` and restored on reload. To reset the camera back to defaults, run this in the browser console:
+- `camera-state` - camera position and orbit target
+- `camera-mode` - `perspective` | `isometric`
+- `iso-view-index` - isometric corner index (0..3)
+
+Reset to defaults (browser console):
 
 ```js
 localStorage.removeItem('camera-state');
+localStorage.removeItem('camera-mode');
+localStorage.removeItem('iso-view-index');
 ```
 
 ### Grid Settings

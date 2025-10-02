@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, TransformControls } from '@react-three/drei';
+import { OrbitControls, Grid, TransformControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
 import type { Object3D, LineSegments, Mesh } from 'three';
 import type {
   OrbitControls as ThreeOrbitControls,
@@ -71,7 +71,18 @@ export function Scene() {
     'render-mode',
     'textured'
   );
+  type CameraMode = 'perspective' | 'isometric';
+  const [cameraMode, setCameraMode] = usePersistedState<CameraMode>(
+    'camera-mode',
+    'perspective'
+  );
+  const [isoIndex, setIsoIndex] = usePersistedState<number>(
+    'iso-view-index',
+    0
+  );
   const [isSnapActive, setIsSnapActive] = useState(false);
+  const lastPoseRef = useRef<{ position: Vector3; target: Vector3 } | null>(null);
+  const lastPerspectivePosRef = useRef<Vector3>(new Vector3(1, 1, 1));
 
   // Orbit controls ref to allow custom cursor-centered zoom
   const orbitControlsRef = useRef<ThreeOrbitControls | null>(null);
@@ -171,6 +182,16 @@ export function Scene() {
         return;
       }
 
+      // Isometric view rotation with arrow keys
+      if (cameraMode === 'isometric' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        setIsoIndex((prev) => {
+          const next = e.key === 'ArrowLeft' ? (prev + 1) % 4 : (prev + 3) % 4;
+          return next;
+        });
+        return;
+      }
+
       // Delete selected object with Delete key
       if (e.key === 'Delete') {
         if (selectedId) {
@@ -191,7 +212,7 @@ export function Scene() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSettingsOpen, isPromptModalOpen, selectedId]);
+  }, [isSettingsOpen, isPromptModalOpen, selectedId, cameraMode]);
 
   // Track hover over transform gizmo to avoid selecting through it
   useEffect(() => {
@@ -477,13 +498,22 @@ export function Scene() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{
-          position: [1, 1, 1], // 100cm = 1 unit in Three.js (we'll use meters)
-          fov: 50,
-        }}
         style={{ background: '#d3d3d3' }}
         onPointerMissed={() => setSelectedId(null)}
       >
+        <CameraRig
+          mode={cameraMode}
+          isoIndex={isoIndex}
+          lastPoseRef={lastPoseRef}
+          lastPerspectivePosRef={lastPerspectivePosRef}
+        />
+        <SyncCameraOnModeChange
+          mode={cameraMode}
+          controlsRef={orbitControlsRef}
+          lastPoseRef={lastPoseRef}
+          lastPerspectivePosRef={lastPerspectivePosRef}
+          isoIndex={isoIndex}
+        />
         {/* Ambient/Key lights */}
         <ambientLight intensity={1.0} />
         <hemisphereLight intensity={0.6} groundColor="#444444" />
@@ -667,13 +697,13 @@ export function Scene() {
                   prev.map((p) =>
                     p.id === id
                       ? {
-                          ...p,
-                          transform: {
-                            position: newPos,
-                            rotation: newRot,
-                            scale: newScale,
-                          },
-                        }
+                        ...p,
+                        transform: {
+                          position: newPos,
+                          rotation: newRot,
+                          scale: newScale,
+                        },
+                      }
                       : p
                   )
                 );
@@ -698,13 +728,14 @@ export function Scene() {
           dampingFactor={0.05}
           target={[0, 0, 0]} // Look at origin
           enabled={orbitEnabled}
-          enableZoom={false} // disable default wheel zoom; we implement cursor-centered zoom
+          enableZoom={cameraMode === 'isometric'}
+          enableRotate={cameraMode !== 'isometric'}
         />
 
         {/* Custom cursor-centered zoom handler */}
         <CursorWheelZoom
           controlsRef={orbitControlsRef}
-          enabled={orbitEnabled}
+          enabled={orbitEnabled && cameraMode === 'perspective'}
         />
         {/* Persist camera position and orbit target across reloads */}
         <PersistCamera controlsRef={orbitControlsRef} />
@@ -773,6 +804,41 @@ export function Scene() {
         >
           Solid
         </button>
+        <div className="w-px h-4 bg-gray-300 mx-1" />
+        <button
+          onClick={() => setCameraMode('perspective')}
+          className={`${cameraMode === 'perspective' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'} px-2 py-1 rounded text-xs`}
+          title="Perspective camera"
+        >
+          Persp
+        </button>
+        <div className="flex items-center bg-white rounded">
+          <button
+            onClick={() => setCameraMode('isometric')}
+            className={`${cameraMode === 'isometric' ? 'bg-indigo-500 text-white' : 'bg-white text-gray-700'} px-2 py-1 rounded-l text-xs`}
+            title="Isometric camera"
+          >
+            Iso
+          </button>
+          {cameraMode === 'isometric' && (
+            <div className="flex">
+              <button
+                onClick={() => setIsoIndex((v) => (v + 1) % 4)}
+                className="px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                title="Rotate left (←)"
+              >
+                ←
+              </button>
+              <button
+                onClick={() => setIsoIndex((v) => (v + 3) % 4)}
+                className="px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 rounded-r"
+                title="Rotate right (→)"
+              >
+                →
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Prompt Input */}
@@ -875,6 +941,130 @@ export function Scene() {
       )}
     </div>
   );
+}
+
+function CameraRig({ mode, isoIndex, lastPoseRef, lastPerspectivePosRef }: {
+  mode: 'perspective' | 'isometric';
+  isoIndex: number;
+  lastPoseRef: React.MutableRefObject<{ position: Vector3; target: Vector3 } | null>;
+  lastPerspectivePosRef: React.MutableRefObject<Vector3>;
+}) {
+  const { size } = useThree();
+  // Classic isometric uses an orthographic projection with camera rotated
+  // 35.264° down and 45° around Y.
+  const isoDistance = 5;
+  const isoPositions = useMemo(() => {
+    const d = isoDistance;
+    return [
+      new Vector3(1, 1, 1).multiplyScalar(d), // +X +Y +Z
+      new Vector3(-1, 1, 1).multiplyScalar(d), // -X +Y +Z
+      new Vector3(-1, 1, -1).multiplyScalar(d), // -X +Y -Z
+      new Vector3(1, 1, -1).multiplyScalar(d), // +X +Y -Z
+    ];
+  }, []);
+
+  // Update makeDefault cameras when mode changes
+  if (mode === 'isometric') {
+    const initial = lastPoseRef.current?.position ?? isoPositions[isoIndex % 4];
+    return (
+      <OrthographicCamera
+        makeDefault
+        left={-size.width / 200}
+        right={size.width / 200}
+        top={size.height / 200}
+        bottom={-size.height / 200}
+        near={-1000}
+        far={1000}
+        position={[initial.x, initial.y, initial.z]}
+        rotation={[Math.atan(Math.sqrt(2)), Math.PI / 4, 0]}
+      />
+    );
+  }
+  const perspInit = lastPoseRef.current?.position ?? lastPerspectivePosRef.current;
+  return <PerspectiveCamera makeDefault position={[perspInit.x, perspInit.y, perspInit.z]} fov={50} />;
+}
+
+function SyncCameraOnModeChange({
+  mode,
+  controlsRef,
+  lastPoseRef,
+  lastPerspectivePosRef,
+  isoIndex,
+}: {
+  mode: 'perspective' | 'isometric';
+  controlsRef: React.RefObject<ThreeOrbitControls | null>;
+  lastPoseRef: React.MutableRefObject<{ position: Vector3; target: Vector3 } | null>;
+  lastPerspectivePosRef: React.MutableRefObject<Vector3>;
+  isoIndex: number;
+}) {
+  const { camera } = useThree();
+
+  // Store last live pose every frame
+  useFrame(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    lastPoseRef.current = {
+      position: camera.position.clone(),
+      target: controls.target.clone(),
+    };
+  });
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    // When entering perspective, remember a reasonable position to re-use
+    if (mode === 'perspective') {
+      if (lastPoseRef.current) {
+        lastPerspectivePosRef.current.copy(lastPoseRef.current.position);
+      }
+    }
+  }, [mode, controlsRef, lastPoseRef, lastPerspectivePosRef]);
+
+  // Animate camera position on isoIndex change or mode change
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    // If we just mounted a new camera, ensure we start the animation from the last known pose
+    if (lastPoseRef.current) {
+      camera.position.copy(lastPoseRef.current.position);
+      controls.target.copy(lastPoseRef.current.target);
+      controls.update();
+    }
+
+    let start = 0;
+    const duration = 350; // ms
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+    const from = lastPoseRef.current?.position.clone() ?? camera.position.clone();
+
+    const targetIsoPositions = [
+      new Vector3(1, 1, 1),
+      new Vector3(-1, 1, 1),
+      new Vector3(-1, 1, -1),
+      new Vector3(1, 1, -1),
+    ].map((v) => v.multiplyScalar(5));
+
+    const to = mode === 'isometric'
+      ? targetIsoPositions[isoIndex % 4]
+      : lastPerspectivePosRef.current.clone();
+
+    let raf = 0;
+    const step = (ts: number) => {
+      if (start === 0) start = ts;
+      const t = Math.min(1, (ts - start) / duration);
+      const k = easeOutCubic(t);
+      camera.position.lerpVectors(from, to, k);
+      controls.update();
+      if (t < 1) {
+        raf = requestAnimationFrame(step);
+      }
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [mode, isoIndex, controlsRef, camera, lastPerspectivePosRef]);
+
+  return null;
 }
 
 function PersistCamera({
