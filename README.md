@@ -32,8 +32,9 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Safer selection** - Hovering/dragging the transform gizmo prevents selecting objects behind it
 - **Isometric camera** - Orthographic isometric view with classic tilt; toggle Persp/Iso (center-top)
 - **Isometric rotation** - In Iso mode, ArrowLeft rotates CCW and ArrowRight rotates CW across 8 views (4 classic corners plus top-left, top-right, top-front, top-back); tiny arrows in UI do the same
+- **Isometric drag snapping** - In Iso, left-drag snaps to the nearest of 8 sectors around screen center; no need to hit exact 45° angles
 - **Animated transitions** - Smooth camera lerp between Persp↔Iso and between Iso corners
-- **Zoom behavior** - Cursor-centered zoom in Persp; standard wheel zoom in Iso (rotation disabled in Iso)
+- **Zoom behavior** - Cursor-centered zoom in Persp; standard wheel zoom in Iso; pan disabled in Iso
 - **Stack-carry movement** - When moving an object, any objects resting on top of it are carried along (15cm snap tolerance)
 
 ### 📦 Modal System
@@ -175,7 +176,7 @@ src/
    - When generation finishes, the progress button disappears and the model automatically appears in the 3D viewport
 
 3. **Explore Your Models**
-   - **Left-click + drag** - Rotate camera around the models
+   - **Left-click + drag** - Rotate camera; in Perspective it orbits freely, in Isometric it snaps between 8 views
 
 - **Scroll wheel** - Zoom in/out toward the cursor
   - **Click a model** - Select it and show transform gizmo
@@ -228,7 +229,7 @@ src/
 Defaults:
 
 - Perspective: initial position `(1, 1, 1)`, `fov=50`
-- Isometric: orthographic projection (~35.264° tilt, 45° yaw), four corner views
+- Isometric: orthographic projection (~35.264° tilt) with eight evenly spaced views on a constant-elevation ring (every 45°); drag snaps to nearest sector; pan disabled in Iso; camera does not change while transforming objects
 - Toggle: Center-top buttons `Persp` and `Iso` (with small arrows in Iso)
 
 Persistence keys in `localStorage`:
