@@ -17,3 +17,11 @@ export interface SceneObject {
   prompt: string;
   timestamp: number;
 }
+
+export interface HistoryRecord {
+  id: string;
+  modelUrl: string;
+  imageUrl: string;
+  prompt: string;
+  time: number;
+}

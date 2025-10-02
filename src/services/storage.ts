@@ -1,10 +1,11 @@
-import { get, set, del } from 'idb-keyval';
-import type { GeneratedImage, SceneObject } from './types';
+import { get, set, del, createStore, entries } from 'idb-keyval';
+import type { GeneratedImage, SceneObject, HistoryRecord } from './types';
 import type { Synexa3DResult } from './synexa';
 
 const IMAGE_KEY_PREFIX = 'generated-image-';
 const MODEL_3D_KEY_PREFIX = 'generated-3d-model-';
 const SCENE_OBJECTS_KEY = 'scene-objects';
+const HISTORY_STORE = createStore('play3d-history', 'history');
 
 export async function saveGeneratedImage(
   id: string,
@@ -62,4 +63,36 @@ export async function getSceneObjects(): Promise<SceneObject[]> {
 
 export async function clearSceneObjects(): Promise<void> {
   await del(SCENE_OBJECTS_KEY);
+}
+
+// History records storage (separate object store)
+export async function addHistoryRecord(record: HistoryRecord): Promise<string> {
+  const key = `history-${record.time}`;
+  await set(key, record, HISTORY_STORE);
+  return key;
+}
+
+export async function listHistoryRecords(): Promise<{
+  key: string;
+  value: HistoryRecord;
+}[]> {
+  const all = await entries(HISTORY_STORE);
+  const results: { key: string; value: HistoryRecord }[] = [];
+  for (const [key, value] of all) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      'modelUrl' in (value as Record<string, unknown>) &&
+      'imageUrl' in (value as Record<string, unknown>) &&
+      'prompt' in (value as Record<string, unknown>) &&
+      'time' in (value as Record<string, unknown>)
+    ) {
+      results.push({ key: String(key), value: value as HistoryRecord });
+    }
+  }
+  return results;
+}
+
+export async function deleteHistoryRecord(key: string): Promise<void> {
+  await del(key, HISTORY_STORE);
 }

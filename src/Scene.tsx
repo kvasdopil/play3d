@@ -27,6 +27,7 @@ import {
   generate3DModelId,
   getSceneObjects,
   saveSceneObjects,
+  addHistoryRecord,
 } from './services/storage';
 import { FaRotate } from 'react-icons/fa6';
 import { PiResizeBold } from 'react-icons/pi';
@@ -406,6 +407,22 @@ export function Scene() {
         // Display model in modal
         finalModelUrl = generated3DModel.modelUrl;
         setModelUrl(generated3DModel.modelUrl);
+      }
+
+      // Save history record (separate table)
+      try {
+        const dataUrl = generatedImageData.startsWith('data:')
+          ? generatedImageData
+          : `data:image/png;base64,${generatedImageData}`;
+        await addHistoryRecord({
+          id: `${modelId}-history`,
+          modelUrl: finalModelUrl,
+          imageUrl: dataUrl,
+          prompt: submittedPrompt,
+          time: Date.now(),
+        });
+      } catch (e) {
+        console.warn('Failed to write history record', e);
       }
 
       // Check if model already exists in scene (prevent duplicates)

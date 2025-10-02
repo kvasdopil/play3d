@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { IoClose, IoTimeOutline } from 'react-icons/io5';
-import { entries } from 'idb-keyval';
+import { listHistoryRecords } from '../services/storage';
 
 interface HistoryModalProps {
   isOpen: boolean;
@@ -35,98 +35,17 @@ export function HistoryModal({
     const load = async () => {
       setIsLoading(true);
       try {
-        const all = await entries();
+        const rows = await listHistoryRecords();
         if (isCancelled) return;
-        const collected: HistoryItem[] = [];
-        // Track latest image per prompt
-        const promptToImage: Record<
-          string,
-          { data: string; timestamp: number }
-        > = {};
-        for (const [key, value] of all) {
-          if (value && typeof value === 'object') {
-            if (Array.isArray(value)) {
-              for (let i = 0; i < value.length; i++) {
-                const v = value[i];
-                if (v && typeof v === 'object' && 'modelUrl' in v) {
-                  const vObj = v as Record<string, unknown>;
-                  const id =
-                    typeof vObj.id === 'string'
-                      ? vObj.id
-                      : `${String(key)}::${i}`;
-                  const modelUrl = vObj.modelUrl;
-                  const prompt = vObj.prompt;
-                  const ts = vObj.timestamp;
-                  if (typeof modelUrl === 'string') {
-                    collected.push({
-                      id: String(id),
-                      modelUrl: modelUrl,
-                      prompt: typeof prompt === 'string' ? prompt : undefined,
-                      timestamp: typeof ts === 'number' ? ts : undefined,
-                    });
-                  }
-                } else if (
-                  v &&
-                  typeof v === 'object' &&
-                  'data' in v &&
-                  'prompt' in v
-                ) {
-                  const vObj = v as Record<string, unknown>;
-                  const prompt = vObj.prompt;
-                  const data = vObj.data;
-                  const ts = vObj.timestamp;
-                  if (
-                    typeof prompt === 'string' &&
-                    typeof data === 'string' &&
-                    typeof ts === 'number'
-                  ) {
-                    const prev = promptToImage[prompt];
-                    if (!prev || ts > prev.timestamp) {
-                      promptToImage[prompt] = { data, timestamp: ts };
-                    }
-                  }
-                }
-              }
-            } else if ('modelUrl' in (value as Record<string, unknown>)) {
-              const vObj = value as Record<string, unknown>;
-              const modelUrl = vObj.modelUrl;
-              const prompt = vObj.prompt;
-              const ts = vObj.timestamp;
-              if (typeof modelUrl === 'string') {
-                collected.push({
-                  id: String(key),
-                  modelUrl,
-                  prompt: typeof prompt === 'string' ? prompt : undefined,
-                  timestamp: typeof ts === 'number' ? ts : undefined,
-                });
-              }
-            } else if (
-              'data' in (value as Record<string, unknown>) &&
-              'prompt' in (value as Record<string, unknown>)
-            ) {
-              const vObj = value as Record<string, unknown>;
-              const prompt = vObj.prompt;
-              const data = vObj.data;
-              const ts = vObj.timestamp;
-              if (
-                typeof prompt === 'string' &&
-                typeof data === 'string' &&
-                typeof ts === 'number'
-              ) {
-                const prev = promptToImage[prompt];
-                if (!prev || ts > prev.timestamp) {
-                  promptToImage[prompt] = { data, timestamp: ts };
-                }
-              }
-            }
-          }
-        }
-        // Attach thumbnails based on prompt
-        for (const item of collected) {
-          if (item.prompt && promptToImage[item.prompt]) {
-            item.imageData = promptToImage[item.prompt].data;
-          }
-        }
+        const collected: HistoryItem[] = rows.map(({ key, value }) => ({
+          id: key,
+          modelUrl: value.modelUrl,
+          prompt: value.prompt,
+          timestamp: value.time,
+          imageData: value.imageUrl.startsWith('data:')
+            ? value.imageUrl.replace(/^data:\w+\/\w+;base64,/, '')
+            : value.imageUrl,
+        }));
         collected.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
         setItems(collected);
       } finally {
