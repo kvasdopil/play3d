@@ -30,10 +30,10 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Persistent render choice** - Render mode toggle (center-top) is saved across reloads
 - **Camera persistence** - Camera position and orbit target are saved to localStorage and restored on reload
 - **Safer selection** - Hovering/dragging the transform gizmo prevents selecting objects behind it
- - **Isometric camera** - Orthographic isometric view with classic tilt; toggle Persp/Iso (center-top)
- - **Isometric rotation** - In Iso mode, ArrowLeft rotates CCW and ArrowRight rotates CW across 4 corners; tiny arrows in UI do the same
- - **Animated transitions** - Smooth camera lerp between Persp↔Iso and between Iso corners
- - **Zoom behavior** - Cursor-centered zoom in Persp; standard wheel zoom in Iso (rotation disabled in Iso)
+- **Isometric camera** - Orthographic isometric view with classic tilt; toggle Persp/Iso (center-top)
+- **Isometric rotation** - In Iso mode, ArrowLeft rotates CCW and ArrowRight rotates CW across 4 corners; tiny arrows in UI do the same
+- **Animated transitions** - Smooth camera lerp between Persp↔Iso and between Iso corners
+- **Zoom behavior** - Cursor-centered zoom in Persp; standard wheel zoom in Iso (rotation disabled in Iso)
 
 ### 📦 Modal System
 
@@ -43,6 +43,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Model Preview** - Download generated .glb files directly from the modal
 - **No backdrop interference** - Transparent modals that don't obscure the 3D scene
 - **History Modal** - Browse previously generated 3D objects (with thumbnails) from IndexedDB and add them back to the scene
+- **Upload .glb** - Import a local .glb into History; filename becomes the prompt and the thumbnail remains empty
 
 ### ⚙️ Settings Management
 
@@ -184,6 +185,7 @@ src/
   - **Generate new model** - Adds to the scene (no replacement)
   - **Delete selected** - Red trash icon (top-right) or `Delete` key removes the currently selected object
   - **History** - Clock icon (top-right) opens a list of known 3D objects from IndexedDB with thumbnails; click "Add to scene" to insert
+  - **Upload .glb** - In the History modal, click "Upload .glb" to add a local model to History; the filename (without extension) becomes the prompt and the image thumbnail is empty
   - **New prompt** - + button (top-left) opens the prompt input anytime when not editing/transforming
   - **Render mode** - Center-top toggle between Textured and Solid; Solid shows unique pastel fills and mesh lines
   - **Reload page** - Your entire scene is automatically restored!
@@ -205,6 +207,7 @@ src/
 - **Download Model** - Save generated .glb file for use in other tools
 - **Smart Caching** - Same prompt = instant retrieval from IndexedDB
 - **Inline Edit** - Click the light gray edit icon next to the prompt to edit; press Update to regenerate the image in-place (the textarea turns back into normal text immediately)
+- **Upload .glb** - From the History modal, import a local .glb; the filename becomes the prompt and the thumbnail shows as N/A
 
 ### Scene Persistence
 

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IoClose, IoTimeOutline } from 'react-icons/io5';
-import { listHistoryRecords } from '../services/storage';
+import { addHistoryRecord, listHistoryRecords } from '../services/storage';
 
 interface HistoryModalProps {
   isOpen: boolean;
@@ -28,6 +28,63 @@ export function HistoryModal({
 
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const onUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const onFileSelected: React.ChangeEventHandler<HTMLInputElement> = async (
+    e
+  ) => {
+    const file = e.target.files?.[0] || null;
+    // Allow re-selecting the same file later
+    e.currentTarget.value = '';
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.glb')) {
+      alert('Please select a .glb file');
+      return;
+    }
+    try {
+      const reader = new FileReader();
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsDataURL(file);
+      });
+
+      // Filename (without extension) becomes the prompt
+      const nameNoExt = file.name.replace(/\.[^/.]+$/, '');
+      const prompt = nameNoExt
+        .replace(/[-_]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const time = Date.now();
+      const key = await addHistoryRecord({
+        id: `manual-${time}`,
+        modelUrl: dataUrl,
+        imageUrl: '',
+        prompt,
+        time,
+      });
+
+      // Prepend new item to the list
+      setItems((prev) => [
+        {
+          id: key,
+          modelUrl: dataUrl,
+          prompt,
+          timestamp: time,
+          imageData: undefined,
+        },
+        ...prev,
+      ]);
+    } catch (err) {
+      console.error('Failed to import .glb into history:', err);
+      alert('Failed to import .glb');
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,13 +125,30 @@ export function HistoryModal({
             <IoTimeOutline size={22} className="text-gray-700" />
             <h2 className="text-xl font-semibold text-gray-900">History</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="Close history"
-          >
-            <IoClose size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".glb"
+              className="hidden"
+              onChange={onFileSelected}
+            />
+            <button
+              onClick={onUploadClick}
+              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
+              aria-label="Upload .glb to history"
+              title="Upload .glb to history"
+            >
+              Upload .glb
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Close history"
+            >
+              <IoClose size={24} />
+            </button>
+          </div>
         </div>
 
         <div className="space-y-3 max-h-[60vh] overflow-auto pr-1">

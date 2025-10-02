@@ -72,10 +72,12 @@ export async function addHistoryRecord(record: HistoryRecord): Promise<string> {
   return key;
 }
 
-export async function listHistoryRecords(): Promise<{
-  key: string;
-  value: HistoryRecord;
-}[]> {
+export async function listHistoryRecords(): Promise<
+  {
+    key: string;
+    value: HistoryRecord;
+  }[]
+> {
   const all = await entries(HISTORY_STORE);
   const results: { key: string; value: HistoryRecord }[] = [];
   for (const [key, value] of all) {

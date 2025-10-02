@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, TransformControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
+import {
+  OrbitControls,
+  Grid,
+  TransformControls,
+  OrthographicCamera,
+  PerspectiveCamera,
+} from '@react-three/drei';
 import type { Object3D, LineSegments, Mesh } from 'three';
 import type {
   OrbitControls as ThreeOrbitControls,
@@ -82,7 +88,9 @@ export function Scene() {
     0
   );
   const [isSnapActive, setIsSnapActive] = useState(false);
-  const lastPoseRef = useRef<{ position: Vector3; target: Vector3 } | null>(null);
+  const lastPoseRef = useRef<{ position: Vector3; target: Vector3 } | null>(
+    null
+  );
   const lastPerspectivePosRef = useRef<Vector3>(new Vector3(1, 1, 1));
 
   // Orbit controls ref to allow custom cursor-centered zoom
@@ -184,7 +192,10 @@ export function Scene() {
       }
 
       // Isometric view rotation with arrow keys
-      if (cameraMode === 'isometric' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      if (
+        cameraMode === 'isometric' &&
+        (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+      ) {
         e.preventDefault();
         setIsoIndex((prev) => {
           const next = e.key === 'ArrowLeft' ? (prev + 1) % 4 : (prev + 3) % 4;
@@ -213,7 +224,7 @@ export function Scene() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSettingsOpen, isPromptModalOpen, selectedId, cameraMode]);
+  }, [isSettingsOpen, isPromptModalOpen, selectedId, cameraMode, setIsoIndex]);
 
   // Track hover over transform gizmo to avoid selecting through it
   useEffect(() => {
@@ -960,10 +971,18 @@ export function Scene() {
   );
 }
 
-function CameraRig({ mode, isoIndex, lastPoseRef, lastPerspectivePosRef }: {
+function CameraRig({
+  mode,
+  isoIndex,
+  lastPoseRef,
+  lastPerspectivePosRef,
+}: {
   mode: 'perspective' | 'isometric';
   isoIndex: number;
-  lastPoseRef: React.MutableRefObject<{ position: Vector3; target: Vector3 } | null>;
+  lastPoseRef: React.MutableRefObject<{
+    position: Vector3;
+    target: Vector3;
+  } | null>;
   lastPerspectivePosRef: React.MutableRefObject<Vector3>;
 }) {
   const { size } = useThree();
@@ -997,8 +1016,15 @@ function CameraRig({ mode, isoIndex, lastPoseRef, lastPerspectivePosRef }: {
       />
     );
   }
-  const perspInit = lastPoseRef.current?.position ?? lastPerspectivePosRef.current;
-  return <PerspectiveCamera makeDefault position={[perspInit.x, perspInit.y, perspInit.z]} fov={50} />;
+  const perspInit =
+    lastPoseRef.current?.position ?? lastPerspectivePosRef.current;
+  return (
+    <PerspectiveCamera
+      makeDefault
+      position={[perspInit.x, perspInit.y, perspInit.z]}
+      fov={50}
+    />
+  );
 }
 
 function SyncCameraOnModeChange({
@@ -1010,7 +1036,10 @@ function SyncCameraOnModeChange({
 }: {
   mode: 'perspective' | 'isometric';
   controlsRef: React.RefObject<ThreeOrbitControls | null>;
-  lastPoseRef: React.MutableRefObject<{ position: Vector3; target: Vector3 } | null>;
+  lastPoseRef: React.MutableRefObject<{
+    position: Vector3;
+    target: Vector3;
+  } | null>;
   lastPerspectivePosRef: React.MutableRefObject<Vector3>;
   isoIndex: number;
 }) {
@@ -1053,7 +1082,8 @@ function SyncCameraOnModeChange({
     let start = 0;
     const duration = 350; // ms
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-    const from = lastPoseRef.current?.position.clone() ?? camera.position.clone();
+    const from =
+      lastPoseRef.current?.position.clone() ?? camera.position.clone();
 
     const targetIsoPositions = [
       new Vector3(1, 1, 1),
@@ -1062,9 +1092,10 @@ function SyncCameraOnModeChange({
       new Vector3(1, 1, -1),
     ].map((v) => v.multiplyScalar(5));
 
-    const to = mode === 'isometric'
-      ? targetIsoPositions[isoIndex % 4]
-      : lastPerspectivePosRef.current.clone();
+    const to =
+      mode === 'isometric'
+        ? targetIsoPositions[isoIndex % 4]
+        : lastPerspectivePosRef.current.clone();
 
     let raf = 0;
     const step = (ts: number) => {
@@ -1140,7 +1171,7 @@ function PersistCamera({
         ],
       };
       window.localStorage.setItem('camera-state', JSON.stringify(state));
-    } catch (err) {
+    } catch {
       // ignore write errors
     }
   });

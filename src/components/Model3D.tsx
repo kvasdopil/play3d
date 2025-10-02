@@ -8,6 +8,9 @@ import {
   MeshBasicMaterial,
   Color,
   Mesh,
+  BufferGeometry,
+  Material,
+  Group,
   WebGLRenderer,
   Scene as ThreeScene,
   Camera,
@@ -178,9 +181,9 @@ const LoadedModel = memo(
               renderer: WebGLRenderer,
               sceneArg: ThreeScene,
               camera: Camera,
-              geometry: any,
-              material: any,
-              group: any
+              geometry: BufferGeometry,
+              material: Material,
+              group: Group
             ) => {
               const baseMat = n.material;
               // draw overlay AFTER the normal draw so it appears on top
@@ -197,13 +200,13 @@ const LoadedModel = memo(
               const original = (n.userData as Record<string, unknown>)
                 .__originalOnAfterRender as
                 | ((
-                    renderer: WebGLRenderer,
-                    scene: ThreeScene,
-                    camera: Camera,
-                    geometry: any,
-                    material: any,
-                    group: any
-                  ) => void)
+                  renderer: WebGLRenderer,
+                  scene: ThreeScene,
+                  camera: Camera,
+                  geometry: BufferGeometry,
+                  material: Material,
+                  group: Group
+                ) => void)
                 | undefined;
               if (original) {
                 original(renderer, sceneArg, camera, geometry, material, group);
@@ -227,21 +230,21 @@ const LoadedModel = memo(
             const original = (n.userData as Record<string, unknown>)
               .__originalOnAfterRender as
               | ((
-                  renderer: WebGLRenderer,
-                  scene: ThreeScene,
-                  camera: Camera,
-                  geometry: any,
-                  material: any,
-                  group: any
-                ) => void)
+                renderer: WebGLRenderer,
+                scene: ThreeScene,
+                camera: Camera,
+                geometry: BufferGeometry,
+                material: Material,
+                group: Group
+              ) => void)
               | undefined;
             n.onAfterRender = (
               renderer: WebGLRenderer,
               sceneArg: ThreeScene,
               camera: Camera,
-              geometry: any,
-              material: any,
-              group: any
+              geometry: BufferGeometry,
+              material: Material,
+              group: Group
             ) => {
               if (original) {
                 original(renderer, sceneArg, camera, geometry, material, group);
