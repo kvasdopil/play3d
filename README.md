@@ -34,6 +34,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Isometric rotation** - In Iso mode, ArrowLeft rotates CCW and ArrowRight rotates CW across 4 corners; tiny arrows in UI do the same
 - **Animated transitions** - Smooth camera lerp between Persp↔Iso and between Iso corners
 - **Zoom behavior** - Cursor-centered zoom in Persp; standard wheel zoom in Iso (rotation disabled in Iso)
+- **Stack-carry movement** - When moving an object, any objects resting on top of it are carried along (15cm snap tolerance)
 
 ### 📦 Modal System
 
@@ -180,7 +181,9 @@ src/
   - **Click a model** - Select it and show transform gizmo
   - **Move/Rotate/Scale** - Use the toolbar on the top-left to change modes
   - **Drag to move** - Bottom snaps to ground or to other objects' top faces when within 15cm
+  - **Stack carry while moving** - Any objects resting on the moved object's top face come along for the ride
   - **Snap highlight** - Transparent orange bottom face shows while snapping is active
+  - **Cancel move** - Press `Escape` to revert the move for the selected object and all carried objects
   - **Close modal** - Model stays in the scene
   - **Generate new model** - Adds to the scene (no replacement)
   - **Delete selected** - Red trash icon (top-right) or `Delete` key removes the currently selected object

@@ -106,6 +106,10 @@ export function Scene() {
   } | null>(null);
   const skipCommitRef = useRef<boolean>(false);
   const [controlsReset, setControlsReset] = useState(0);
+  // Group move support
+  const carriedIdsRef = useRef<Set<string>>(new Set());
+  const groupStartPositionsRef = useRef<Record<string, [number, number, number]>>({});
+  const rootStartPosRef = useRef<Vector3 | null>(null);
 
   // Track what changed between renders
   const prevStateRef = useRef({
@@ -292,6 +296,20 @@ export function Scene() {
           o.rotation.set(snap.rotation[0], snap.rotation[1], snap.rotation[2]);
           o.scale.set(snap.scale, snap.scale, snap.scale);
         }
+        // Restore carried group positions if any (translate mode only)
+        if (transformMode === 'translate' && carriedIdsRef.current.size > 0) {
+          for (const cid of carriedIdsRef.current) {
+            if (cid === id) continue;
+            const co = objectRefs.current[cid] ?? null;
+            const start = groupStartPositionsRef.current[cid];
+            if (co && start) {
+              co.position.set(start[0], start[1], start[2]);
+            }
+          }
+        }
+        carriedIdsRef.current.clear();
+        groupStartPositionsRef.current = {};
+        rootStartPosRef.current = null;
         setIsTransforming(false);
         setOrbitEnabled(true);
         setIsTransformHovered(false);
@@ -619,8 +637,8 @@ export function Scene() {
             denoiseSamples={2}
             denoiseRadius={8}
           />
-          <HueSaturation saturation={0.3} />
-          <BrightnessContrast brightness={0.25} contrast={0.2} />
+          <HueSaturation saturation={0.1} />
+          <BrightnessContrast brightness={0.1} contrast={0.1} />
           {/* <Bloom
             intensity={0.2}
             radius={0.05}
@@ -680,6 +698,19 @@ export function Scene() {
               } else {
                 setIsSnapActive(false);
               }
+
+              // Apply grouped translation to carried objects (keep relative offsets)
+              if (rootStartPosRef.current && carriedIdsRef.current.size > 0) {
+                const delta = o.position.clone().sub(rootStartPosRef.current);
+                for (const cid of carriedIdsRef.current) {
+                  if (cid === id) continue; // root is already moved by controls
+                  const co = objectRefs.current[cid] ?? null;
+                  const start = groupStartPositionsRef.current[cid];
+                  if (co && start) {
+                    co.position.set(start[0] + delta.x, start[1] + delta.y, start[2] + delta.z);
+                  }
+                }
+              }
             }}
             onMouseDown={() => {
               setOrbitEnabled(false);
@@ -693,8 +724,48 @@ export function Scene() {
                   rotation: [o.rotation.x, o.rotation.y, o.rotation.z],
                   scale: o.scale.x,
                 };
+                // Prepare grouped carry data for translate mode
+                if (transformMode === 'translate' && id) {
+                  // Helper to find all objects stacked on top (recursively)
+                  const collectStackAbove = (baseId: string, acc: Set<string>) => {
+                    const baseObj = objectRefs.current[baseId] ?? null;
+                    if (!baseObj) return;
+                    const baseBox = new Box3().setFromObject(baseObj);
+                    const baseTopY = baseBox.max.y;
+                    for (const [oid, obj] of Object.entries(objectRefs.current)) {
+                      if (!obj || oid === baseId || acc.has(oid)) continue;
+                      const box = new Box3().setFromObject(obj);
+                      const xOverlap = baseBox.max.x > box.min.x && baseBox.min.x < box.max.x;
+                      const zOverlap = baseBox.max.z > box.min.z && baseBox.min.z < box.max.z;
+                      const restingOnTop = Math.abs(box.min.y - baseTopY) <= snapThreshold;
+                      if (xOverlap && zOverlap && restingOnTop) {
+                        acc.add(oid);
+                        collectStackAbove(oid, acc);
+                      }
+                    }
+                  };
+                  const group = new Set<string>([id]);
+                  collectStackAbove(id, group);
+                  carriedIdsRef.current = group;
+                  // Snapshot start positions for all carried objects
+                  groupStartPositionsRef.current = {};
+                  for (const cid of group) {
+                    const co = objectRefs.current[cid] ?? null;
+                    if (co) {
+                      groupStartPositionsRef.current[cid] = [co.position.x, co.position.y, co.position.z];
+                    }
+                  }
+                  rootStartPosRef.current = o.position.clone();
+                } else {
+                  carriedIdsRef.current.clear();
+                  groupStartPositionsRef.current = {};
+                  rootStartPosRef.current = null;
+                }
               } else {
                 dragStartSnapshotRef.current = null;
+                carriedIdsRef.current.clear();
+                groupStartPositionsRef.current = {};
+                rootStartPosRef.current = null;
               }
               skipCommitRef.current = false;
             }}
@@ -705,37 +776,49 @@ export function Scene() {
               if (skipCommitRef.current) {
                 // Clear the flag and skip committing the transform
                 skipCommitRef.current = false;
+                carriedIdsRef.current.clear();
+                groupStartPositionsRef.current = {};
+                rootStartPosRef.current = null;
                 return;
               }
               const id = selectedId;
               const o = id ? (objectRefs.current[id] ?? null) : null;
               if (o && id) {
-                const newPos: [number, number, number] = [
-                  o.position.x,
-                  o.position.y,
-                  o.position.z,
-                ];
-                const newRot: [number, number, number] = [
-                  o.rotation.x,
-                  o.rotation.y,
-                  o.rotation.z,
-                ];
-                const newScale = o.scale.x;
+                // Commit positions for all carried objects if translating; always commit root fully
+                const carried = new Set<string>(carriedIdsRef.current);
                 setSceneObjects((prev) =>
-                  prev.map((p) =>
-                    p.id === id
-                      ? {
+                  prev.map((p) => {
+                    const refObj = objectRefs.current[p.id] ?? null;
+                    if (!refObj) return p;
+                    if (p.id === id) {
+                      // Root: commit pos+rot+scale
+                      return {
                         ...p,
                         transform: {
-                          position: newPos,
-                          rotation: newRot,
-                          scale: newScale,
+                          position: [refObj.position.x, refObj.position.y, refObj.position.z],
+                          rotation: [refObj.rotation.x, refObj.rotation.y, refObj.rotation.z],
+                          scale: refObj.scale.x,
                         },
-                      }
-                      : p
-                  )
+                      };
+                    }
+                    if (transformMode === 'translate' && carried.has(p.id)) {
+                      // Carried child: commit new position, keep rotation/scale
+                      return {
+                        ...p,
+                        transform: {
+                          position: [refObj.position.x, refObj.position.y, refObj.position.z],
+                          rotation: p.transform.rotation,
+                          scale: p.transform.scale,
+                        },
+                      };
+                    }
+                    return p;
+                  })
                 );
               }
+              carriedIdsRef.current.clear();
+              groupStartPositionsRef.current = {};
+              rootStartPosRef.current = null;
             }}
           />
         )}
