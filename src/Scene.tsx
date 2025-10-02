@@ -17,6 +17,7 @@ import { HistoryModal } from './components/HistoryModal';
 import { Model3D } from './components/Model3D';
 import { generateImage } from './services/gemini';
 import { generate3DModel } from './services/synexa';
+import { generate3DModelWithTripo } from './services/tripo';
 import type { SceneObject } from './services/types';
 import {
   saveGeneratedImage,
@@ -351,6 +352,20 @@ export function Scene() {
 
         if (cachedImage) {
           setGeneratedImageData(cachedImage.data);
+          // Save image-only history record immediately
+          try {
+            const dataUrl = cachedImage.data.startsWith('data:')
+              ? cachedImage.data
+              : `data:image/png;base64,${cachedImage.data}`;
+            await addHistoryRecord({
+              id: `${imageId}-image-${Date.now()}`,
+              imageUrl: dataUrl,
+              prompt,
+              time: Date.now(),
+            });
+          } catch (e) {
+            console.warn('Failed to write image history record', e);
+          }
         } else {
           // Generate new image with enhanced prompt
           const generatedImage = await generateImage(
@@ -366,6 +381,21 @@ export function Scene() {
 
           // Display image
           setGeneratedImageData(generatedImage.data);
+
+          // Save image-only history record immediately
+          try {
+            const dataUrl = generatedImage.data.startsWith('data:')
+              ? generatedImage.data
+              : `data:image/png;base64,${generatedImage.data}`;
+            await addHistoryRecord({
+              id: `${imageId}-image-${Date.now()}`,
+              imageUrl: dataUrl,
+              prompt,
+              time: Date.now(),
+            });
+          } catch (e) {
+            console.warn('Failed to write image history record', e);
+          }
         }
       } catch (error) {
         console.error('Error generating image:', error);
@@ -397,7 +427,7 @@ export function Scene() {
     setSelectedId(null);
   };
 
-  const handleGenerate3D = async () => {
+  const handleGenerate3D = async (provider: 'Synexa' | 'Tripo') => {
     if (!generatedImageData || !submittedPrompt) {
       return;
     }
@@ -409,14 +439,12 @@ export function Scene() {
     setError3D(undefined);
 
     try {
-      // Get FAL API key from localStorage
+      // API keys
       const falApiKey = localStorage.getItem('synexa-api-key');
-      if (!falApiKey) {
-        throw new Error('Please set your FAL API key in settings');
-      }
+      const tripoApiKey = localStorage.getItem('tripo-api-key');
 
-      // Check if 3D model already exists in IndexedDB
-      const modelId = generate3DModelId(submittedPrompt);
+      // Check if 3D model already exists in IndexedDB (provider-specific key)
+      const modelId = generate3DModelId(`${provider}:${submittedPrompt}`);
       const cached3DModel = await get3DModel(modelId);
 
       let finalModelUrl: string;
@@ -425,12 +453,27 @@ export function Scene() {
         finalModelUrl = cached3DModel.modelUrl;
         setModelUrl(cached3DModel.modelUrl);
       } else {
-        // Generate new 3D model
-        const generated3DModel = await generate3DModel(
-          generatedImageData,
-          submittedPrompt,
-          JSON.parse(falApiKey)
-        );
+        // Generate new 3D model by provider
+        let generated3DModel;
+        if (provider === 'Synexa') {
+          if (!falApiKey) {
+            throw new Error('Please set your FAL API key in settings');
+          }
+          generated3DModel = await generate3DModel(
+            generatedImageData,
+            submittedPrompt,
+            JSON.parse(falApiKey)
+          );
+        } else {
+          if (!tripoApiKey) {
+            throw new Error('Please set your Tripo API key in settings');
+          }
+          generated3DModel = await generate3DModelWithTripo(
+            generatedImageData,
+            submittedPrompt,
+            JSON.parse(tripoApiKey)
+          );
+        }
 
         // Save to IndexedDB
         await save3DModel(modelId, generated3DModel);
@@ -506,6 +549,20 @@ export function Scene() {
       timestamp: item.timestamp ?? Date.now(),
     };
     setSceneObjects((prev) => [...prev, newSceneObject]);
+  };
+
+  const handleOpenPromptFromHistory = (args: {
+    prompt: string;
+    imageData: string;
+  }) => {
+    // Close history and open prompt modal with provided prompt and image
+    setIsHistoryOpen(false);
+    setSubmittedPrompt(args.prompt);
+    setGeneratedImageData(args.imageData);
+    setImageError(undefined);
+    setModelUrl(undefined);
+    setError3D(undefined);
+    setIsPromptModalOpen(true);
   };
 
   return (
@@ -1067,6 +1124,7 @@ export function Scene() {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         onAddToScene={handleAddFromHistory}
+        onOpenPrompt={handleOpenPromptFromHistory}
       />
 
       {/* Bottom-left generation progress button */}

@@ -20,8 +20,14 @@ export interface SceneObject {
 
 export interface HistoryRecord {
   id: string;
-  modelUrl: string;
-  imageUrl: string;
+  modelUrl?: string;
+  imageUrl?: string;
   prompt: string;
   time: number;
+}
+
+export interface Model3DResult {
+  modelUrl: string;
+  prompt: string;
+  timestamp: number;
 }

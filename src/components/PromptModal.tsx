@@ -12,7 +12,7 @@ interface PromptModalProps {
   isGenerating3D?: boolean;
   error3D?: string;
   onClose: () => void;
-  onGenerate3D?: () => void;
+  onGenerate3D?: (provider: 'Synexa' | 'Tripo') => void;
   onUpdatePrompt?: (newPrompt: string) => void | Promise<void>;
 }
 
@@ -33,6 +33,7 @@ export function PromptModal({
   const [editedPrompt, setEditedPrompt] = useState(prompt);
   const hasChanges = editedPrompt.trim() !== prompt.trim();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [provider, setProvider] = useState<'Synexa' | 'Tripo'>('Synexa');
 
   useEffect(() => {
     // When prompt prop changes or modal opens, sync local state if not actively editing
@@ -134,17 +135,35 @@ export function PromptModal({
                 />
               </div>
 
-              {/* Generate 3D button */}
+              {/* Provider + Generate 3D */}
               {!modelUrl && onGenerate3D && (
-                <button
-                  onClick={onGenerate3D}
-                  disabled={isGenerating3D}
-                  className="w-full px-4 py-3 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
-                >
-                  {isGenerating3D
-                    ? 'Generating 3D Model...'
-                    : 'Generate 3D Model'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="provider" className="text-sm text-gray-600">
+                      Provider
+                    </label>
+                    <select
+                      id="provider"
+                      value={provider}
+                      onChange={(e) =>
+                        setProvider(e.target.value as 'Synexa' | 'Tripo')
+                      }
+                      className="border border-gray-300 rounded-md px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="Synexa">Synexa</option>
+                      <option value="Tripo">Tripo</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => onGenerate3D(provider)}
+                    disabled={isGenerating3D}
+                    className="flex-1 px-4 py-3 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
+                  >
+                    {isGenerating3D
+                      ? 'Generating 3D Model...'
+                      : 'Generate 3D Model'}
+                  </button>
+                </div>
               )}
 
               {/* 3D generation error */}

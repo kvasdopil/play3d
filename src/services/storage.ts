@@ -1,6 +1,10 @@
 import { get, set, del, createStore, entries } from 'idb-keyval';
-import type { GeneratedImage, SceneObject, HistoryRecord } from './types';
-import type { Synexa3DResult } from './synexa';
+import type {
+  GeneratedImage,
+  SceneObject,
+  HistoryRecord,
+  Model3DResult,
+} from './types';
 
 const IMAGE_KEY_PREFIX = 'generated-image-';
 const MODEL_3D_KEY_PREFIX = 'generated-3d-model-';
@@ -32,14 +36,14 @@ export function generateImageId(prompt: string): string {
 // 3D Model storage functions
 export async function save3DModel(
   id: string,
-  model: Synexa3DResult
+  model: Model3DResult
 ): Promise<void> {
   await set(`${MODEL_3D_KEY_PREFIX}${id}`, model);
 }
 
 export async function get3DModel(
   id: string
-): Promise<Synexa3DResult | undefined> {
+): Promise<Model3DResult | undefined> {
   return await get(`${MODEL_3D_KEY_PREFIX}${id}`);
 }
 
@@ -81,14 +85,13 @@ export async function listHistoryRecords(): Promise<
   const all = await entries(HISTORY_STORE);
   const results: { key: string; value: HistoryRecord }[] = [];
   for (const [key, value] of all) {
-    if (
-      value &&
-      typeof value === 'object' &&
-      'modelUrl' in (value as Record<string, unknown>) &&
-      'imageUrl' in (value as Record<string, unknown>) &&
-      'prompt' in (value as Record<string, unknown>) &&
-      'time' in (value as Record<string, unknown>)
-    ) {
+    if (!value || typeof value !== 'object') continue;
+    const rec = value as Record<string, unknown>;
+    const hasPrompt = 'prompt' in rec && typeof rec.prompt === 'string';
+    const hasTime = 'time' in rec && typeof rec.time === 'number';
+    const hasModel = 'modelUrl' in rec && typeof rec.modelUrl === 'string';
+    const hasImage = 'imageUrl' in rec && typeof rec.imageUrl === 'string';
+    if (hasPrompt && hasTime && (hasModel || hasImage)) {
       results.push({ key: String(key), value: value as HistoryRecord });
     }
   }

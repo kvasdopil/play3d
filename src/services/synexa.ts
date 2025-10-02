@@ -1,16 +1,11 @@
 import { fal } from '@fal-ai/client';
-
-export interface Synexa3DResult {
-  modelUrl: string; // URL to the generated 3D model (.glb file)
-  prompt: string;
-  timestamp: number;
-}
+import type { Model3DResult } from './types';
 
 export async function generate3DModel(
   imageDataUrl: string,
   prompt: string,
   apiKey: string
-): Promise<Synexa3DResult> {
+): Promise<Model3DResult> {
   if (!apiKey) {
     throw new Error('FAL API key is required');
   }

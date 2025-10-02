@@ -11,16 +11,18 @@ interface HistoryModalProps {
     prompt?: string;
     timestamp?: number;
   }) => void;
+  onOpenPrompt?: (args: { prompt: string; imageData: string }) => void;
 }
 
 export function HistoryModal({
   isOpen,
   onClose,
   onAddToScene,
+  onOpenPrompt,
 }: HistoryModalProps) {
   interface HistoryItem {
     id: string;
-    modelUrl: string;
+    modelUrl?: string;
     prompt?: string;
     timestamp?: number;
     imageData?: string; // base64 image data for thumbnail
@@ -94,15 +96,22 @@ export function HistoryModal({
       try {
         const rows = await listHistoryRecords();
         if (isCancelled) return;
-        const collected: HistoryItem[] = rows.map(({ key, value }) => ({
-          id: key,
-          modelUrl: value.modelUrl,
-          prompt: value.prompt,
-          timestamp: value.time,
-          imageData: value.imageUrl.startsWith('data:')
-            ? value.imageUrl.replace(/^data:\w+\/\w+;base64,/, '')
-            : value.imageUrl,
-        }));
+        const collected: HistoryItem[] = rows.map(({ key, value }) => {
+          const img = value.imageUrl;
+          const imageData =
+            typeof img === 'string'
+              ? img.startsWith('data:')
+                ? img.replace(/^data:\w+\/[A-Za-z0-9.+-]+;base64,/, '')
+                : img
+              : undefined;
+          return {
+            id: key,
+            modelUrl: value.modelUrl,
+            prompt: value.prompt,
+            timestamp: value.time,
+            imageData,
+          };
+        });
         collected.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
         setItems(collected);
       } finally {
@@ -164,7 +173,15 @@ export function HistoryModal({
             items.map((obj) => (
               <div
                 key={obj.id}
-                className="border border-gray-200 rounded-md p-3 hover:bg-gray-50 transition-colors"
+                className="border border-gray-200 rounded-md p-3 hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => {
+                  if (obj.imageData) {
+                    onOpenPrompt?.({
+                      prompt: obj.prompt ?? '',
+                      imageData: obj.imageData,
+                    });
+                  }
+                }}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
@@ -192,12 +209,22 @@ export function HistoryModal({
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => onAddToScene?.(obj)}
-                    className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors whitespace-nowrap"
-                  >
-                    Add to scene
-                  </button>
+                  {obj.modelUrl && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddToScene?.({
+                          id: obj.id,
+                          modelUrl: obj.modelUrl!,
+                          prompt: obj.prompt,
+                          timestamp: obj.timestamp,
+                        });
+                      }}
+                      className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors whitespace-nowrap"
+                    >
+                      Add to scene
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

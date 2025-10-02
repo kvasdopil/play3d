@@ -16,26 +16,34 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     'synexa-api-key',
     ''
   );
+  const [tripoApiKey, setTripoApiKey] = usePersistedState<string>(
+    'tripo-api-key',
+    ''
+  );
   const [localGeminiValue, setLocalGeminiValue] = useState(geminiApiKey);
   const [localSynexaValue, setLocalSynexaValue] = useState(synexaApiKey);
+  const [localTripoValue, setLocalTripoValue] = useState(tripoApiKey);
 
   // Update local values when modal opens
   useEffect(() => {
     if (isOpen) {
       setLocalGeminiValue(geminiApiKey);
       setLocalSynexaValue(synexaApiKey);
+      setLocalTripoValue(tripoApiKey);
     }
-  }, [isOpen, geminiApiKey, synexaApiKey]);
+  }, [isOpen, geminiApiKey, synexaApiKey, tripoApiKey]);
 
   const handleSave = () => {
     setGeminiApiKey(localGeminiValue);
     setSynexaApiKey(localSynexaValue);
+    setTripoApiKey(localTripoValue);
     onClose();
   };
 
   const handleCancel = () => {
     setLocalGeminiValue(geminiApiKey);
     setLocalSynexaValue(synexaApiKey);
+    setLocalTripoValue(tripoApiKey);
     onClose();
   };
 
@@ -87,6 +95,22 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               value={localSynexaValue}
               onChange={(e) => setLocalSynexaValue(e.target.value)}
               placeholder="Enter your FAL API key"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="tripo-api-key"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Tripo API Key (for 3D generation)
+            </label>
+            <input
+              id="tripo-api-key"
+              type="password"
+              value={localTripoValue}
+              onChange={(e) => setLocalTripoValue(e.target.value)}
+              placeholder="Enter your Tripo API key"
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>

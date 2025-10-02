@@ -7,12 +7,13 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 ### 🤖 AI-Powered Generation
 
 - **Text-to-Image** - Generate images from text prompts using Google Gemini AI
-- **Image-to-3D** - Convert generated images to 3D models using Hunyuan3D (via fal.ai)
+- **Image-to-3D** - Convert generated images to 3D models using Synexa (fal.ai) or Tripo
 - **Smart prompt enhancement** - Automatically optimizes prompts for better 3D generation
 - **Intelligent caching** - Stores generated images and models in IndexedDB for instant reuse
 - **Global prompt input** - Start typing anywhere to create new models
 - **Inline prompt editing** - Edit the prompt directly in the modal and regenerate the image in-place
 - **Background progress indicator** - Bottom-left status button with spinner, thumbnail, and prompt while 3D is generating
+- **Provider selection** - Choose Synexa or Tripo in the Prompt Modal when generating 3D
 
 ### 🎨 3D Viewport
 
@@ -49,7 +50,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 
 ### ⚙️ Settings Management
 
-- **Dual API configuration** - Manage Gemini (image) and fal.ai (3D) API keys
+- **API configuration** - Manage Gemini (image), Synexa/fal.ai (3D), and Tripo (3D) API keys
 - **Persistent storage** - API keys saved securely in browser localStorage
 - **Custom hooks** - `usePersistedState` for automatic state persistence
 - **Easy access** - Settings button with gear icon in top-right corner
@@ -113,6 +114,10 @@ npm run dev
 
 Visit `http://localhost:5173` (or the port shown in terminal)
 
+Dev proxy:
+
+- The dev server proxies `/tripo` to `https://api.tripo3d.ai` to avoid CORS during local development. See `vite.config.ts`.
+
 ### Building
 
 ```bash
@@ -146,7 +151,8 @@ src/
 │   └── usePersistedState.ts # Custom hook for localStorage persistence
 ├── services/
 │   ├── gemini.ts            # Google Gemini AI integration
-│   ├── synexa.ts            # fal.ai Hunyuan3D integration
+│   ├── synexa.ts            # Synexa (fal.ai Hunyuan3D) integration
+│   ├── tripo.ts             # Tripo upload & generation integration
 │   ├── storage.ts           # IndexedDB caching utilities
 │   └── types.ts             # Shared TypeScript interfaces
 ├── assets/                   # Static assets
@@ -164,7 +170,8 @@ src/
 1. **Configure API Keys**
    - Click the settings icon (⚙️) in the top-right corner
    - Enter your [Google Gemini API key](https://aistudio.google.com/app/apikey)
-   - Enter your [fal.ai API key](https://fal.ai/dashboard/keys)
+   - Enter your [fal.ai API key](https://fal.ai/dashboard/keys) (Synexa)
+   - Enter your Tripo API key (Tripo dashboard)
    - Click "Save" to persist keys to localStorage
 
 2. **Generate a 3D Model**
@@ -172,7 +179,8 @@ src/
    - Press `Enter` to submit the prompt
    - Wait for the image to generate (shows in modal)
    - Optionally click the small edit icon next to the prompt to tweak it and press Update to regenerate the image without closing the modal
-   - Click "Generate 3D Model" button; the modal closes and a bottom-left button shows progress (spinner + thumbnail + prompt)
+   - Choose a provider (Synexa or Tripo) next to the "Generate 3D Model" button
+   - Click "Generate 3D Model"; the modal closes and a bottom-left button shows progress (spinner + thumbnail + prompt)
    - When generation finishes, the progress button disappears and the model automatically appears in the 3D viewport
 
 3. **Explore Your Models**
@@ -270,19 +278,27 @@ Modify in `src/Scene.tsx`:
 - This optimization ensures better results for 3D conversion
 - Modify template in `src/Scene.tsx` → `handlePromptSubmit()`
 
-**Hunyuan3D Model Generation:**
+**Hunyuan3D (Synexa) Model Generation:**
 
 - Uses fal.ai's Hunyuan3D v2 API
 - Supports data URLs (base64 images)
 - Default settings (as configured): random seed, steps=20, guidance=7.5, octree resolution=96, textured mesh enabled
 - Modify in `src/services/synexa.ts` → `generate3DModel()`
 
+**Tripo Model Generation:**
+
+- Uploads the generated image to Tripo, then starts a generation job
+- Uses model `v3.0-20250812` with `auto_size: true`
+- Polls until completion and returns a `.glb` URL
+- Modify in `src/services/tripo.ts`
+- Docs: [Upload](https://platform.tripo3d.ai/docs/upload), [Generation](https://platform.tripo3d.ai/docs/generation)
+
 ### Storage & Caching
 
 - **Images cached in IndexedDB** - Key format: `image_{hash(prompt)}`
 - **Models cached in IndexedDB** - Key format: `model3d_{hash(prompt)}`
 - **Scene state in IndexedDB** - All objects with transforms persisted automatically
-- **API keys in localStorage** - Keys: `gemini-api-key`, `synexa-api-key`
+- **API keys in localStorage** - Keys: `gemini-api-key`, `synexa-api-key`, `tripo-api-key`
 - Cache persists across sessions for instant reloading
 - Scene is fully restored on page reload with all objects and positions
 - **History scanning** - History modal scans IndexedDB for entries containing a `modelUrl`
