@@ -16,7 +16,6 @@ import { PromptInput } from './components/PromptInput';
 import { PromptModal } from './components/PromptModal';
 import { HistoryModal } from './components/HistoryModal';
 import { Model3D } from './components/Model3D';
-import { generate3DModelWithTripo } from './services/tripo';
 import type { SceneObject } from './services/types';
 import {
   saveGeneratedImage,
@@ -134,6 +133,65 @@ async function generate3DModelViaSynexaAPI(
   }
 }
 
+// Function to generate 3D model via Tripo API endpoints
+async function generate3DModelViaTripoAPI(
+  imageDataUrl: string,
+  prompt: string,
+  onProgress?: (status: string, progress?: number) => void
+): Promise<{ modelUrl: string; prompt: string; timestamp: number }> {
+  // Start the generation (upload + create job)
+  const startResponse = await fetch('/api/gen/3d/tripo', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ imageDataUrl, prompt }),
+  });
+
+  if (!startResponse.ok) {
+    const error = await startResponse.json();
+    throw new Error(error.error || 'Failed to start 3D generation');
+  }
+
+  const { taskId } = await startResponse.json();
+
+  // Poll for completion
+  while (true) {
+    const statusResponse = await fetch(`/api/gen/3d/tripo/${taskId}`);
+
+    if (!statusResponse.ok) {
+      const error = await statusResponse.json();
+      throw new Error(error.error || 'Failed to check generation status');
+    }
+
+    const statusData = await statusResponse.json();
+
+    if (onProgress) {
+      onProgress(statusData.status, statusData.progress);
+    }
+
+    if (statusData.status === 'completed') {
+      // Get the model URL from the status response
+      const modelUrl = statusData.modelUrl;
+      if (!modelUrl) {
+        throw new Error('No model URL in completed result');
+      }
+
+      return {
+        modelUrl,
+        prompt,
+        timestamp: Date.now(),
+      };
+    } else if (statusData.status === 'failed') {
+      const errorMsg = statusData.error || '3D generation failed';
+      throw new Error(errorMsg);
+    }
+
+    // Wait 2 seconds before checking again
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
+
 // (removed CanvasLogger debug component)
 
 export function Scene() {
@@ -149,6 +207,7 @@ export function Scene() {
   const [imageError, setImageError] = useState<string | undefined>();
   const [modelUrl, setModelUrl] = useState<string | undefined>();
   const [isGenerating3D, setIsGenerating3D] = useState(false);
+  const [generation3DProgress, setGeneration3DProgress] = useState(0);
   const [error3D, setError3D] = useState<string | undefined>();
   const [sceneObjects, setSceneObjects] = useState<SceneObject[]>([]);
   const [isSceneLoaded, setIsSceneLoaded] = useState(false);
@@ -514,12 +573,10 @@ export function Scene() {
     setIsPromptModalOpen(false);
 
     setIsGenerating3D(true);
+    setGeneration3DProgress(0);
     setError3D(undefined);
 
     try {
-      // API keys (only Tripo still uses localStorage)
-      const tripoApiKey = localStorage.getItem('tripo-api-key');
-
       // Check if 3D model already exists in IndexedDB (provider-specific key)
       const modelId = generate3DModelId(`${provider}:${submittedPrompt}`);
       const cached3DModel = await get3DModel(modelId);
@@ -538,19 +595,22 @@ export function Scene() {
             submittedPrompt,
             (status, logs) => {
               console.log(`Synexa generation status: ${status}`);
+              // For now, Synexa doesn't provide progress, but we could estimate based on status
+              const estimatedProgress = status === 'completed' ? 100 : status === 'processing' ? 50 : 0;
+              setGeneration3DProgress(estimatedProgress);
               if (logs) {
                 logs.forEach((log) => console.log('Synexa log:', log.message));
               }
             }
           );
         } else {
-          if (!tripoApiKey) {
-            throw new Error('Please set your Tripo API key in settings');
-          }
-          generated3DModel = await generate3DModelWithTripo(
+          generated3DModel = await generate3DModelViaTripoAPI(
             generatedImageData,
             submittedPrompt,
-            tripoApiKey
+            (status, progress) => {
+              console.log(`Tripo generation status: ${status}, progress: ${progress}%`);
+              setGeneration3DProgress(progress || 0);
+            }
           );
         }
 
@@ -1217,7 +1277,10 @@ export function Scene() {
             <span className="text-sm text-gray-700 truncate max-w-[240px]">
               {submittedPrompt}
             </span>
-            <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-600">{generation3DProgress}%</span>
+              <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
+            </div>
           </button>
         </div>
       )}
