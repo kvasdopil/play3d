@@ -21,6 +21,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Interactive 3D canvas** - Full-screen Three.js viewport powered by React Three Fiber
 - **Orbit controls** - Drag to rotate; scroll to zoom toward the cursor for precise navigation
 - **Grid system** - 10cm cell grid on horizontal plane, visible from both sides
+- **Checkerboard ground** - Procedural checker surface at y=0 for visual grounding
 - **Professional lighting** - Ambient and directional lights for realistic rendering
 - **Auto-loading** - Generated 3D models automatically appear in the scene
 - **Multi-object support** - Display multiple 3D models simultaneously
@@ -280,17 +281,29 @@ localStorage.removeItem('iso-view-index');
 ### Grid Settings
 
 - Cell size: 10cm (0.1m)
-- Grid size: 10m × 10m
+- Grid size: 100m × 100m
 - Double-sided rendering
 
 Modify in `src/Scene.tsx`:
 
 ```tsx
 <Grid
-  args={[10, 10]}
+  args={[100, 100]}
   cellSize={0.1}
   // ... other props
 />
+```
+
+### Checkerboard Ground Settings
+
+- Procedural checker texture on a large plane at y=0
+- Tweak size and tiling with the `size` and `repeat` props
+
+Modify in `src/Scene.tsx`:
+
+```tsx
+// Add or adjust the checker ground
+<CheckerPlane size={100} repeat={80} />
 ```
 
 ### AI Generation Settings
