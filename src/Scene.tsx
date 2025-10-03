@@ -16,8 +16,6 @@ import { PromptInput } from './components/PromptInput';
 import { PromptModal } from './components/PromptModal';
 import { HistoryModal } from './components/HistoryModal';
 import { Model3D } from './components/Model3D';
-import { generateImage } from './services/gemini';
-import { generate3DModel } from './services/synexa';
 import { generate3DModelWithTripo } from './services/tripo';
 import type { SceneObject } from './services/types';
 import {
@@ -47,6 +45,94 @@ import { PersistCamera } from './components/scene/PersistCamera';
 import { CursorWheelZoom } from './components/scene/CursorWheelZoom';
 import { SelectionBounds } from './components/scene/SelectionBounds';
 import { IsoDragRotate } from './components/scene/IsoDragRotate';
+
+// Function to generate image via API endpoint
+async function generateImageViaAPI(prompt: string) {
+  const response = await fetch('/api/gen/img/gemini', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to generate image');
+  }
+
+  return await response.json();
+}
+
+// Function to generate 3D model via Synexa API endpoints
+async function generate3DModelViaSynexaAPI(
+  imageDataUrl: string,
+  prompt: string,
+  onProgress?: (status: string, logs?: Array<{ message: string }>) => void
+): Promise<{ modelUrl: string; prompt: string; timestamp: number }> {
+  // Start the generation
+  const startResponse = await fetch('/api/gen/3d/synexa', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ imageDataUrl, prompt }),
+  });
+
+  if (!startResponse.ok) {
+    const error = await startResponse.json();
+    throw new Error(error.error || 'Failed to start 3D generation');
+  }
+
+  const { taskId } = await startResponse.json();
+
+  // Poll for completion
+  while (true) {
+    const statusResponse = await fetch(`/api/gen/3d/synexa/${taskId}`);
+
+    if (!statusResponse.ok) {
+      const error = await statusResponse.json();
+      throw new Error(error.error || 'Failed to check generation status');
+    }
+
+    const statusData = await statusResponse.json();
+
+    if (onProgress) {
+      onProgress(statusData.status, statusData.logs);
+    }
+
+    if (statusData.status === 'completed') {
+      // Prefer explicit modelUrl from the API
+      let modelUrl: string | undefined = statusData.modelUrl;
+      // Fallback to result structure if present
+      if (!modelUrl) {
+        modelUrl = statusData.result?.model_mesh?.url || statusData.result?.url;
+      }
+      // As a last resort, call the download endpoint to materialize the file
+      if (!modelUrl) {
+        const dl = await fetch(`/api/gen/3d/synexa/${taskId}/download`);
+        if (!dl.ok) {
+          const err = await dl.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to download generated model');
+        }
+        // Create an object URL from the blob for immediate use
+        const blob = await dl.blob();
+        modelUrl = URL.createObjectURL(blob);
+      }
+
+      return {
+        modelUrl,
+        prompt,
+        timestamp: Date.now(),
+      };
+    } else if (statusData.status === 'failed') {
+      throw new Error('3D generation failed');
+    }
+
+    // Wait 2 seconds before checking again
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
 
 // (removed CanvasLogger debug component)
 
@@ -338,12 +424,6 @@ export function Scene() {
       setIsGeneratingImage(true);
 
       try {
-        // Get API key from localStorage
-        const apiKey = localStorage.getItem('gemini-api-key');
-        if (!apiKey) {
-          throw new Error('Please set your Gemini API key in settings');
-        }
-
         // Create enhanced prompt for better 3D generation
         const enhancedPrompt = `Create an image for me: ${prompt}. White background, no shadow, top-corner view. No other objects in the image.`;
 
@@ -369,10 +449,7 @@ export function Scene() {
           }
         } else {
           // Generate new image with enhanced prompt
-          const generatedImage = await generateImage(
-            enhancedPrompt,
-            apiKey
-          );
+          const generatedImage = await generateImageViaAPI(enhancedPrompt);
 
           // Save to IndexedDB with original prompt
           await saveGeneratedImage(imageId, {
@@ -440,8 +517,7 @@ export function Scene() {
     setError3D(undefined);
 
     try {
-      // API keys
-      const falApiKey = localStorage.getItem('synexa-api-key');
+      // API keys (only Tripo still uses localStorage)
       const tripoApiKey = localStorage.getItem('tripo-api-key');
 
       // Check if 3D model already exists in IndexedDB (provider-specific key)
@@ -457,13 +533,15 @@ export function Scene() {
         // Generate new 3D model by provider
         let generated3DModel;
         if (provider === 'Synexa') {
-          if (!falApiKey) {
-            throw new Error('Please set your FAL API key in settings');
-          }
-          generated3DModel = await generate3DModel(
+          generated3DModel = await generate3DModelViaSynexaAPI(
             generatedImageData,
             submittedPrompt,
-            falApiKey
+            (status, logs) => {
+              console.log(`Synexa generation status: ${status}`);
+              if (logs) {
+                logs.forEach((log) => console.log('Synexa log:', log.message));
+              }
+            }
           );
         } else {
           if (!tripoApiKey) {
@@ -1081,20 +1159,13 @@ export function Scene() {
           setImageError(undefined);
           setIsGeneratingImage(true);
           try {
-            const apiKey = localStorage.getItem('gemini-api-key');
-            if (!apiKey) {
-              throw new Error('Please set your Gemini API key in settings');
-            }
             const enhancedPrompt = `Create an image for me: ${trimmed}. White background, no shadow, top-corner view. No other objects in the image.`;
             const imageId = generateImageId(trimmed);
             const cachedImage = await getGeneratedImage(imageId);
             if (cachedImage) {
               setGeneratedImageData(cachedImage.data);
             } else {
-              const generatedImage = await generateImage(
-                enhancedPrompt,
-                apiKey
-              );
+              const generatedImage = await generateImageViaAPI(enhancedPrompt);
               await saveGeneratedImage(imageId, {
                 ...generatedImage,
                 prompt: trimmed,
