@@ -5,21 +5,30 @@ export function usePersistedState<T>(
   key: string,
   initialValue: T
 ): [T, Dispatch<SetStateAction<T>>] {
-  // Get initial value from localStorage or use provided initialValue
-  const [state, setState] = useState<T>(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      console.error(`Error loading ${key} from localStorage:`, error);
-      return initialValue;
-    }
-  });
+  // Initialize with provided value to avoid SSR window access
+  const [state, setState] = useState<T>(initialValue);
 
-  // Update localStorage when state changes
+  // Read from localStorage on client after mount
   useEffect(() => {
     try {
-      window.localStorage.setItem(key, JSON.stringify(state));
+      if (typeof window !== 'undefined') {
+        const item = window.localStorage.getItem(key);
+        if (item != null) {
+          setState(JSON.parse(item));
+        }
+      }
+    } catch (error) {
+      console.error(`Error loading ${key} from localStorage:`, error);
+    }
+    // Run only on mount or key change
+  }, [key]);
+
+  // Persist to localStorage when state changes (client only)
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(key, JSON.stringify(state));
+      }
     } catch (error) {
       console.error(`Error saving ${key} to localStorage:`, error);
     }

@@ -25,11 +25,8 @@ function ensureDataUrl(image: string): string {
 }
 
 function baseUrl() {
-  // Use Vite dev proxy in development
-  if (typeof window !== 'undefined' && import.meta.env.DEV) {
-    return '/tripo';
-  }
-  return 'https://api.tripo3d.ai';
+  // Always route through Next.js API proxy
+  return '/api/tripo';
 }
 
 export async function uploadToTripo(

@@ -1,3 +1,4 @@
+'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, TransformControls } from '@react-three/drei';
@@ -370,7 +371,7 @@ export function Scene() {
           // Generate new image with enhanced prompt
           const generatedImage = await generateImage(
             enhancedPrompt,
-            JSON.parse(apiKey)
+            apiKey
           );
 
           // Save to IndexedDB with original prompt
@@ -462,7 +463,7 @@ export function Scene() {
           generated3DModel = await generate3DModel(
             generatedImageData,
             submittedPrompt,
-            JSON.parse(falApiKey)
+            falApiKey
           );
         } else {
           if (!tripoApiKey) {
@@ -471,7 +472,7 @@ export function Scene() {
           generated3DModel = await generate3DModelWithTripo(
             generatedImageData,
             submittedPrompt,
-            JSON.parse(tripoApiKey)
+            tripoApiKey
           );
         }
 
@@ -1092,7 +1093,7 @@ export function Scene() {
             } else {
               const generatedImage = await generateImage(
                 enhancedPrompt,
-                JSON.parse(apiKey)
+                apiKey
               );
               await saveGeneratedImage(imageId, {
                 ...generatedImage,
