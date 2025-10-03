@@ -12,8 +12,9 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 - **Intelligent caching** - Stores generated images and models in IndexedDB for instant reuse
 - **Global prompt input** - Start typing anywhere to create new models
 - **Inline prompt editing** - Edit the prompt directly in the modal and regenerate the image in-place
-- **Background progress indicator** - Bottom-left status button with spinner, thumbnail, and prompt while 3D is generating
+- **Background progress indicator** - Bottom-left status button with spinner, thumbnail, prompt, and real-time progress percentage while 3D is generating
 - **Provider selection** - Choose Synexa or Tripo in the Prompt Modal when generating 3D
+- **Secure API handling** - All API keys stored server-side in environment variables
 
 ### 🎨 3D Viewport
 
@@ -50,9 +51,9 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 
 ### ⚙️ Settings Management
 
-- **API configuration** - Manage Gemini (image), Synexa/fal.ai (3D), and Tripo (3D) API keys
-- **Persistent storage** - API keys saved securely in browser localStorage
-- **Custom hooks** - `usePersistedState` for automatic state persistence
+- **Environment configuration** - API keys configured via `.env.local` file (server-side)
+- **Secure storage** - API keys never exposed to the browser
+- **Custom hooks** - `usePersistedState` for UI state persistence
 - **Easy access** - Settings button with gear icon in top-right corner
 
 ### 🛠️ Development Tools
@@ -78,8 +79,7 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 
 ### AI & Storage
 
-- **@google/genai** - Google Gemini AI for text-to-image generation
-- **@fal-ai/client** - fal.ai client for Hunyuan3D model generation
+- **Next.js API Routes** - Server-side API integration for Gemini, Synexa, and Tripo
 - **idb-keyval** - IndexedDB wrapper for caching images and models
 
 ### Styling & UI
@@ -106,6 +106,18 @@ An innovative 3D model generation tool built with React, Three.js, and AI. Trans
 npm install
 ```
 
+### Configuration
+
+Create a `.env.local` file in the root directory with your API keys:
+
+```env
+GEMINI_API_KEY=your_google_gemini_api_key_here
+SYNEXA_API_KEY=your_fal_ai_api_key_here
+TRIPO_API_KEY=your_tripo_api_key_here
+```
+
+⚠️ **Important**: Make sure `.env.local` is added to your `.gitignore` file to prevent committing sensitive API keys.
+
 ### Development
 
 ```bash
@@ -113,10 +125,6 @@ npm run dev
 ```
 
 Visit `http://localhost:5173` (or the port shown in terminal)
-
-Dev proxy:
-
-- The dev server proxies `/tripo` to `https://api.tripo3d.ai` to avoid CORS during local development. See `vite.config.ts`.
 
 ### Building
 
@@ -141,6 +149,25 @@ npm run format
 
 ```
 src/
+├── app/
+│   └── api/
+│       ├── gen/
+│       │   ├── img/
+│       │   │   └── gemini/
+│       │   │       └── route.ts    # Google Gemini image generation API
+│       │   └── 3d/
+│       │       ├── synexa/
+│       │       │   ├── route.ts               # Synexa 3D generation API
+│       │       │   ├── [taskId]/
+│       │       │   │   └── route.ts           # Synexa status polling
+│       │       │   └── [taskId]/download/
+│       │       │       └── route.ts           # Synexa model download
+│       │       └── tripo/
+│       │           ├── route.ts               # Tripo 3D generation API
+│       │           ├── [taskId]/
+│       │           │   └── route.ts           # Tripo status polling
+│       │           └── [taskId]/download/
+│       │               └── route.ts           # Tripo model download
 ├── components/
 │   ├── Model3D.tsx          # 3D model loader component
 │   ├── PromptInput.tsx      # Global prompt input modal
@@ -150,9 +177,6 @@ src/
 ├── hooks/
 │   └── usePersistedState.ts # Custom hook for localStorage persistence
 ├── services/
-│   ├── gemini.ts            # Google Gemini AI integration
-│   ├── synexa.ts            # Synexa (fal.ai Hunyuan3D) integration
-│   ├── tripo.ts             # Tripo upload & generation integration
 │   ├── storage.ts           # IndexedDB caching utilities
 │   └── types.ts             # Shared TypeScript interfaces
 ├── assets/                   # Static assets
@@ -168,11 +192,10 @@ src/
 ### Quick Start Guide
 
 1. **Configure API Keys**
-   - Click the settings icon (⚙️) in the top-right corner
-   - Enter your [Google Gemini API key](https://aistudio.google.com/app/apikey)
-   - Enter your [fal.ai API key](https://fal.ai/dashboard/keys) (Synexa)
-   - Enter your Tripo API key (Tripo dashboard)
-   - Click "Save" to persist keys to localStorage
+   - Create a `.env.local` file with your API keys (see Configuration section above)
+   - Get your [Google Gemini API key](https://aistudio.google.com/app/apikey)
+   - Get your [fal.ai API key](https://fal.ai/dashboard/keys) (Synexa)
+   - Get your Tripo API key from your Tripo dashboard
 
 2. **Generate a 3D Model**
    - Start typing anywhere (e.g., "red sports car") or click the + button (top-left) to open the prompt box
@@ -276,29 +299,35 @@ Modify in `src/Scene.tsx`:
 
 - Prompts are automatically enhanced with: `"Create an image for me: {prompt}. White background, no shadow, top-corner view. No other objects in the image."`
 - This optimization ensures better results for 3D conversion
-- Modify template in `src/Scene.tsx` → `handlePromptSubmit()`
+- Server-side API: `POST /api/gen/img/gemini`
+- Modify template in `src/Scene.tsx` → `generateImageViaAPI()`
 
 **Hunyuan3D (Synexa) Model Generation:**
 
-- Uses fal.ai's Hunyuan3D v2 API
+- Uses fal.ai's Hunyuan3D v2 API via server-side integration
+- Server-side APIs:
+  - `POST /api/gen/3d/synexa` - Start generation
+  - `GET /api/gen/3d/synexa/{taskId}` - Poll status
+  - `GET /api/gen/3d/synexa/{taskId}/download` - Download model
 - Supports data URLs (base64 images)
-- Default settings (as configured): random seed, steps=20, guidance=7.5, octree resolution=96, textured mesh enabled
-- Modify in `src/services/synexa.ts` → `generate3DModel()`
+- Default settings: random seed, steps=20, guidance=7.5, octree resolution=96, textured mesh enabled
 
 **Tripo Model Generation:**
 
-- Uploads the generated image to Tripo, then starts a generation job
+- Uses Tripo's v2 task API via server-side integration
+- Server-side APIs:
+  - `POST /api/gen/3d/tripo` - Upload image and start generation
+  - `GET /api/gen/3d/tripo/{taskId}` - Poll status with progress
+  - `GET /api/gen/3d/tripo/{taskId}/download` - Download model
 - Uses model `v3.0-20250812` with `auto_size: true`
-- Polls until completion and returns a `.glb` URL
-- Modify in `src/services/tripo.ts`
-- Docs: [Upload](https://platform.tripo3d.ai/docs/upload), [Generation](https://platform.tripo3d.ai/docs/generation)
+- Docs: [Upload](https://platform.tripo3d.ai/docs/upload), [Task](https://platform.tripo3d.ai/docs/task), [Generation](https://platform.tripo3d.ai/docs/generation)
 
 ### Storage & Caching
 
 - **Images cached in IndexedDB** - Key format: `image_{hash(prompt)}`
 - **Models cached in IndexedDB** - Key format: `model3d_{hash(prompt)}`
 - **Scene state in IndexedDB** - All objects with transforms persisted automatically
-- **API keys in localStorage** - Keys: `gemini-api-key`, `synexa-api-key`, `tripo-api-key`
+- **API keys in environment variables** - Stored server-side in `.env.local`
 - Cache persists across sessions for instant reloading
 - Scene is fully restored on page reload with all objects and positions
 - **History scanning** - History modal scans IndexedDB for entries containing a `modelUrl`
@@ -340,10 +369,11 @@ Modify in `src/Scene.tsx`:
 
 ## 🔐 API Keys & Privacy
 
-- **API keys are stored locally** in your browser's localStorage
-- Keys are never sent to any server except the respective AI services
-- Clear browser data to remove cached keys
-- Keep your API keys secure and never commit them to version control
+- **API keys are stored server-side** in `.env.local` (never exposed to browser)
+- Keys are loaded server-side and used to proxy requests to AI services
+- No sensitive data is ever sent to the client
+- Keep your `.env.local` file secure and never commit it to version control
+- Add `.env.local` to your `.gitignore` file
 
 ## React Compiler
 

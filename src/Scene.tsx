@@ -596,7 +596,8 @@ export function Scene() {
             (status, logs) => {
               console.log(`Synexa generation status: ${status}`);
               // For now, Synexa doesn't provide progress, but we could estimate based on status
-              const estimatedProgress = status === 'completed' ? 100 : status === 'processing' ? 50 : 0;
+              const estimatedProgress =
+                status === 'completed' ? 100 : status === 'processing' ? 50 : 0;
               setGeneration3DProgress(estimatedProgress);
               if (logs) {
                 logs.forEach((log) => console.log('Synexa log:', log.message));
@@ -608,7 +609,9 @@ export function Scene() {
             generatedImageData,
             submittedPrompt,
             (status, progress) => {
-              console.log(`Tripo generation status: ${status}, progress: ${progress}%`);
+              console.log(
+                `Tripo generation status: ${status}, progress: ${progress}%`
+              );
               setGeneration3DProgress(progress || 0);
             }
           );
@@ -1278,7 +1281,9 @@ export function Scene() {
               {submittedPrompt}
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-600">{generation3DProgress}%</span>
+              <span className="text-xs text-gray-600">
+                {generation3DProgress}%
+              </span>
               <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
             </div>
           </button>
