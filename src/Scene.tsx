@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, TransformControls } from '@react-three/drei';
 import type { Object3D } from 'three';
@@ -7,7 +7,7 @@ import type {
   OrbitControls as ThreeOrbitControls,
   TransformControls as ThreeTransformControls,
 } from 'three-stdlib';
-import { Box3, Vector3 } from 'three';
+import { Box3, Vector3, CanvasTexture, RepeatWrapping, SRGBColorSpace, DoubleSide, NearestFilter } from 'three';
 import { IoSettingsSharp, IoTrashSharp, IoTimeOutline } from 'react-icons/io5';
 import { IoAdd } from 'react-icons/io5';
 import { RotatingCube } from './RotatingCube';
@@ -44,6 +44,47 @@ import { PersistCamera } from './components/scene/PersistCamera';
 import { CursorWheelZoom } from './components/scene/CursorWheelZoom';
 import { SelectionBounds } from './components/scene/SelectionBounds';
 import { IsoDragRotate } from './components/scene/IsoDragRotate';
+
+function CheckerPlane({ size = 10, repeat = 40 }: { size?: number; repeat?: number }) {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 2;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#aaaaaa';
+      ctx.fillRect(0, 0, 1, 1);
+      ctx.fillRect(1, 1, 1, 1);
+      ctx.fillStyle = '#999999';
+      ctx.fillRect(1, 0, 1, 1);
+      ctx.fillRect(0, 1, 1, 1);
+    }
+    const tex = new CanvasTexture(canvas);
+    tex.wrapS = RepeatWrapping;
+    tex.wrapT = RepeatWrapping;
+    tex.repeat.set(repeat, repeat);
+    tex.colorSpace = SRGBColorSpace;
+    tex.magFilter = NearestFilter;
+    tex.minFilter = NearestFilter;
+    tex.anisotropy = 1;
+    return tex;
+  }, [repeat]);
+
+  return (
+    <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => { }} renderOrder={-1}>
+      <planeGeometry args={[size, size, 1, 1]} />
+      <meshStandardMaterial
+        map={texture}
+        roughness={1}
+        metalness={0}
+        side={0}
+        polygonOffset
+        polygonOffsetFactor={1}
+        polygonOffsetUnits={1}
+      />
+    </mesh>
+  );
+}
 
 // Function to generate image via API endpoint
 async function generateImageViaAPI(prompt: string) {
@@ -764,12 +805,15 @@ export function Scene() {
         {/* Ambient/Key lights */}
         <ambientLight intensity={0.0} />
         <hemisphereLight intensity={0.5} groundColor="#444444" />
-        <directionalLight position={[15, 15, 15]} intensity={3.0} />
-        <directionalLight position={[-15, 15, -15]} intensity={1.0} />
+        <directionalLight position={[15, 15, 15]} intensity={1.9} />
+        <directionalLight position={[-15, 15, -15]} intensity={0.9} />
+
+        {/* Checkerboard ground at y=0 */}
+        <CheckerPlane size={100} repeat={80} />
 
         {/* Grid on horizontal plane (XZ), visible from both sides */}
         <Grid
-          args={[10, 10]} // 10m x 10m grid
+          args={[100, 100]} // 10m x 10m grid
           cellSize={0.1} // 10cm cells
           cellThickness={1}
           cellColor="#666"
@@ -780,7 +824,7 @@ export function Scene() {
           fadeStrength={1}
           followCamera={false}
           infiniteGrid={false}
-          side={2} // THREE.DoubleSide - visible from both sides
+          side={0} // THREE.DoubleSide - visible from both sides
         />
 
         {/* Display all scene objects or rotating cube placeholder */}
@@ -830,15 +874,15 @@ export function Scene() {
         {/* Postprocessing - Ambient Occlusion */}
         <EffectComposer>
           <N8AO
-            intensity={8}
-            aoRadius={3}
-            distanceFalloff={0.5}
+            intensity={2}
+            aoRadius={0.5}
+            distanceFalloff={10}
             quality="ultra"
             aoSamples={32}
             denoiseSamples={2}
             denoiseRadius={8}
           />
-          <HueSaturation saturation={0.1} />
+          <HueSaturation saturation={0.2} />
           <BrightnessContrast brightness={0.2} contrast={0.2} />
           {/* <Bloom
             intensity={0.2}
