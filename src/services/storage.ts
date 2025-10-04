@@ -91,7 +91,8 @@ export async function listHistoryRecords(): Promise<
     const hasTime = 'time' in rec && typeof rec.time === 'number';
     const hasModel = 'modelUrl' in rec && typeof rec.modelUrl === 'string';
     const hasImage = 'imageUrl' in rec && typeof rec.imageUrl === 'string';
-    if (hasPrompt && hasTime && (hasModel || hasImage)) {
+    const hasTask = 'taskId' in rec && typeof rec.taskId === 'string';
+    if (hasPrompt && hasTime && (hasModel || hasImage || hasTask)) {
       results.push({ key: String(key), value: value as HistoryRecord });
     }
   }
@@ -100,4 +101,14 @@ export async function listHistoryRecords(): Promise<
 
 export async function deleteHistoryRecord(key: string): Promise<void> {
   await del(key, HISTORY_STORE);
+}
+
+// Update a history record in-place by key (partial update)
+export async function updateHistoryRecord(
+  key: string,
+  partial: Partial<HistoryRecord>
+): Promise<void> {
+  const existing = (await get(key, HISTORY_STORE)) as HistoryRecord | undefined;
+  if (!existing) return;
+  await set(key, { ...existing, ...partial }, HISTORY_STORE);
 }

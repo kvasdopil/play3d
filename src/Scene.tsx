@@ -27,6 +27,8 @@ import {
   getSceneObjects,
   saveSceneObjects,
   addHistoryRecord,
+  updateHistoryRecord,
+  listHistoryRecords,
 } from './services/storage';
 import { FaRotate } from 'react-icons/fa6';
 import { PiResizeBold } from 'react-icons/pi';
@@ -250,6 +252,18 @@ export function Scene() {
   const [isGenerating3D, setIsGenerating3D] = useState(false);
   const [generation3DProgress, setGeneration3DProgress] = useState(0);
   const [error3D, setError3D] = useState<string | undefined>();
+  const [activeTasks, setActiveTasks] = useState<
+    Array<{
+      key: string;
+      taskId: string;
+      provider: 'Synexa' | 'Tripo';
+      prompt: string;
+      imageData?: string;
+      progress: number;
+      status: 'queued' | 'processing' | 'completed' | 'failed' | 'unknown';
+      modelUrl?: string;
+    }>
+  >([]);
   const [sceneObjects, setSceneObjects] = useState<SceneObject[]>([]);
   const [isSceneLoaded, setIsSceneLoaded] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -613,102 +627,145 @@ export function Scene() {
     // Close the prompt modal while generating
     setIsPromptModalOpen(false);
 
-    setIsGenerating3D(true);
-    setGeneration3DProgress(0);
     setError3D(undefined);
 
     try {
-      // Check if 3D model already exists in IndexedDB (provider-specific key)
+      // Create provider-specific start
+      const startUrl = provider === 'Synexa' ? '/api/gen/3d/synexa' : '/api/gen/3d/tripo';
+      const startResp = await fetch(startUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageDataUrl: generatedImageData, prompt: submittedPrompt }),
+      });
+      if (!startResp.ok) {
+        const err = await startResp.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to start 3D generation');
+      }
+      const { taskId } = await startResp.json();
+
+      // Prepare initial history record with task tracking
+      const dataUrl = generatedImageData.startsWith('data:')
+        ? generatedImageData
+        : `data:image/png;base64,${generatedImageData}`;
+      const time = Date.now();
       const modelId = generate3DModelId(`${provider}:${submittedPrompt}`);
-      const cached3DModel = await get3DModel(modelId);
+      const historyKey = await addHistoryRecord({
+        id: `${modelId}-pending`,
+        imageUrl: dataUrl,
+        prompt: submittedPrompt,
+        time,
+        taskId,
+        provider,
+        status: 'queued',
+        progress: 0,
+      });
 
-      let finalModelUrl: string;
+      // Track task in UI state
+      setActiveTasks((prev) => [
+        ...prev,
+        {
+          key: historyKey,
+          taskId,
+          provider,
+          prompt: submittedPrompt,
+          imageData: dataUrl.replace(/^data:\w+\/[A-Za-z0-9.+-]+;base64,/, ''),
+          progress: 0,
+          status: 'queued',
+        },
+      ]);
 
-      if (cached3DModel) {
-        finalModelUrl = cached3DModel.modelUrl;
-        setModelUrl(cached3DModel.modelUrl);
-      } else {
-        // Generate new 3D model by provider
-        let generated3DModel;
-        if (provider === 'Synexa') {
-          generated3DModel = await generate3DModelViaSynexaAPI(
-            generatedImageData,
-            submittedPrompt,
-            (status, logs) => {
-              console.log(`Synexa generation status: ${status}`);
-              // For now, Synexa doesn't provide progress, but we could estimate based on status
-              const estimatedProgress =
-                status === 'completed' ? 100 : status === 'processing' ? 50 : 0;
-              setGeneration3DProgress(estimatedProgress);
-              if (logs) {
-                logs.forEach((log) => console.log('Synexa log:', log.message));
+      // Start polling loop
+      const poll = async () => {
+        const statusUrl =
+          provider === 'Synexa'
+            ? `/api/gen/3d/synexa/${encodeURIComponent(taskId)}`
+            : `/api/gen/3d/tripo/${encodeURIComponent(taskId)}`;
+        while (true) {
+          let status: 'queued' | 'processing' | 'completed' | 'failed' | 'unknown' = 'unknown';
+          let progress = 0;
+          let modelUrl: string | undefined;
+          try {
+            const resp = await fetch(statusUrl);
+            if (!resp.ok) {
+              const t = await resp.text().catch(() => '');
+              throw new Error(`Status check failed: ${t}`);
+            }
+            const json = await resp.json();
+            status = json.status || 'unknown';
+            progress = typeof json.progress === 'number' ? json.progress : status === 'processing' ? 50 : status === 'queued' ? 0 : status === 'completed' ? 100 : 0;
+            modelUrl = json.modelUrl || undefined;
+          } catch (e) {
+            console.warn('Polling error', e);
+          }
+
+          // Update UI state and history
+          setActiveTasks((prev) =>
+            prev.map((t) =>
+              t.key === historyKey ? { ...t, status, progress, modelUrl } : t
+            )
+          );
+          await updateHistoryRecord(historyKey, { status, progress });
+
+          if (status === 'completed') {
+            // Ensure modelUrl; fallback to download for Synexa
+            let finalModelUrl = modelUrl;
+            if (!finalModelUrl && provider === 'Synexa') {
+              try {
+                const dl = await fetch(`/api/gen/3d/synexa/${encodeURIComponent(taskId)}/download`);
+                if (dl.ok) {
+                  const blob = await dl.blob();
+                  finalModelUrl = URL.createObjectURL(blob);
+                }
+              } catch (e) {
+                console.warn('Download fallback failed', e);
               }
             }
-          );
-        } else {
-          generated3DModel = await generate3DModelViaTripoAPI(
-            generatedImageData,
-            submittedPrompt,
-            (status, progress) => {
-              console.log(
-                `Tripo generation status: ${status}, progress: ${progress}%`
-              );
-              setGeneration3DProgress(progress || 0);
+
+            if (finalModelUrl) {
+              // Save to cache
+              await save3DModel(modelId, {
+                modelUrl: finalModelUrl,
+                prompt: submittedPrompt,
+                timestamp: Date.now(),
+              });
+              await updateHistoryRecord(historyKey, {
+                modelUrl: finalModelUrl,
+              });
+
+              // Add to scene if not exists
+              const exists = sceneObjects.some((o) => o.modelUrl === finalModelUrl);
+              if (!exists) {
+                const newSceneObject: SceneObject = {
+                  id: modelId,
+                  modelUrl: finalModelUrl,
+                  transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
+                  prompt: submittedPrompt,
+                  timestamp: Date.now(),
+                };
+                setSceneObjects((prev) => [...prev, newSceneObject]);
+              }
             }
-          );
+
+            // Remove from active list
+            setActiveTasks((prev) => prev.filter((t) => t.key !== historyKey));
+            break;
+          }
+          if (status === 'failed') {
+            await updateHistoryRecord(historyKey, {});
+            setActiveTasks((prev) => prev.filter((t) => t.key !== historyKey));
+            break;
+          }
+          // Sleep 2s
+          await new Promise((r) => setTimeout(r, 2000));
         }
-
-        // Save to IndexedDB
-        await save3DModel(modelId, generated3DModel);
-
-        // Display model in modal
-        finalModelUrl = generated3DModel.modelUrl;
-        setModelUrl(generated3DModel.modelUrl);
-      }
-
-      // Save history record (separate table)
-      try {
-        const dataUrl = generatedImageData.startsWith('data:')
-          ? generatedImageData
-          : `data:image/png;base64,${generatedImageData}`;
-        await addHistoryRecord({
-          id: `${modelId}-history`,
-          modelUrl: finalModelUrl,
-          imageUrl: dataUrl,
-          prompt: submittedPrompt,
-          time: Date.now(),
-        });
-      } catch (e) {
-        console.warn('Failed to write history record', e);
-      }
-
-      // Check if model already exists in scene (prevent duplicates)
-      const modelExists = sceneObjects.some(
-        (obj) => obj.modelUrl === finalModelUrl
-      );
-
-      if (!modelExists) {
-        // Add to scene objects with default transform
-        const newSceneObject: SceneObject = {
-          id: modelId,
-          modelUrl: finalModelUrl,
-          transform: {
-            position: [0, 0, 0],
-            rotation: [0, 0, 0],
-            scale: 1,
-          },
-          prompt: submittedPrompt,
-          timestamp: Date.now(),
-        };
-        setSceneObjects((prev) => [...prev, newSceneObject]);
-      }
+      };
+      // Do not await to keep UI responsive
+      void poll();
     } catch (error) {
       console.error('Error generating 3D model:', error);
       setError3D(
         error instanceof Error ? error.message : 'Failed to generate 3D model'
       );
-    } finally {
-      setIsGenerating3D(false);
     }
   };
 
@@ -747,6 +804,127 @@ export function Scene() {
     setError3D(undefined);
     setIsPromptModalOpen(true);
   };
+
+  // Resume unfinished tasks on load
+  useEffect(() => {
+    let cancelled = false;
+    const resume = async () => {
+      const rows = await listHistoryRecords();
+      const pending = rows.filter(({ value }) =>
+        value.taskId && value.status !== 'completed' && value.status !== 'failed'
+      );
+      const toActivate = pending.map(({ key, value }) => ({
+        key,
+        taskId: String(value.taskId),
+        provider: (value.provider as 'Synexa' | 'Tripo') || 'Synexa',
+        prompt: value.prompt,
+        imageData: typeof value.imageUrl === 'string'
+          ? value.imageUrl.startsWith('data:')
+            ? value.imageUrl.replace(/^data:\w+\/[A-Za-z0-9.+-]+;base64,/, '')
+            : value.imageUrl
+          : undefined,
+        progress: typeof value.progress === 'number' ? value.progress : 0,
+        status: (value.status as any) || 'queued',
+      }));
+      if (cancelled) return;
+      if (toActivate.length > 0) {
+        setActiveTasks((prev) => {
+          // avoid duplicates
+          const existingKeys = new Set(prev.map((t) => t.key));
+          const merged = [...prev];
+          for (const t of toActivate) {
+            if (!existingKeys.has(t.key)) merged.push(t);
+          }
+          return merged;
+        });
+
+        // Start polling for each
+        for (const t of toActivate) {
+          const provider = t.provider;
+          const taskId = t.taskId;
+          const historyKey = t.key;
+          const statusUrl =
+            provider === 'Synexa'
+              ? `/api/gen/3d/synexa/${encodeURIComponent(taskId)}`
+              : `/api/gen/3d/tripo/${encodeURIComponent(taskId)}`;
+          const modelIdBase = `${provider}:${t.prompt}`;
+          const poll = async () => {
+            while (true) {
+              let status: 'queued' | 'processing' | 'completed' | 'failed' | 'unknown' = 'unknown';
+              let progress = 0;
+              let modelUrl: string | undefined;
+              try {
+                const resp = await fetch(statusUrl);
+                if (!resp.ok) {
+                  const tx = await resp.text().catch(() => '');
+                  throw new Error(`Status check failed: ${tx}`);
+                }
+                const json = await resp.json();
+                status = json.status || 'unknown';
+                progress = typeof json.progress === 'number' ? json.progress : status === 'processing' ? 50 : status === 'queued' ? 0 : status === 'completed' ? 100 : 0;
+                modelUrl = json.modelUrl || undefined;
+              } catch (e) {
+                console.warn('Resume polling error', e);
+              }
+
+              setActiveTasks((prev) =>
+                prev.map((x) => (x.key === historyKey ? { ...x, status, progress, modelUrl } : x))
+              );
+              await updateHistoryRecord(historyKey, { status, progress });
+
+              if (status === 'completed') {
+                let finalModelUrl = modelUrl;
+                if (!finalModelUrl && provider === 'Synexa') {
+                  try {
+                    const dl = await fetch(`/api/gen/3d/synexa/${encodeURIComponent(taskId)}/download`);
+                    if (dl.ok) {
+                      const blob = await dl.blob();
+                      finalModelUrl = URL.createObjectURL(blob);
+                    }
+                  } catch (e) {
+                    console.warn('Download fallback failed', e);
+                  }
+                }
+                if (finalModelUrl) {
+                  const modelId = generate3DModelId(modelIdBase);
+                  await save3DModel(modelId, {
+                    modelUrl: finalModelUrl,
+                    prompt: t.prompt,
+                    timestamp: Date.now(),
+                  });
+                  await updateHistoryRecord(historyKey, { modelUrl: finalModelUrl });
+                  const exists = sceneObjects.some((o) => o.modelUrl === finalModelUrl);
+                  if (!exists) {
+                    const newSceneObject: SceneObject = {
+                      id: modelId,
+                      modelUrl: finalModelUrl,
+                      transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
+                      prompt: t.prompt,
+                      timestamp: Date.now(),
+                    };
+                    setSceneObjects((prev) => [...prev, newSceneObject]);
+                  }
+                }
+                setActiveTasks((prev) => prev.filter((x) => x.key !== historyKey));
+                break;
+              }
+              if (status === 'failed') {
+                await updateHistoryRecord(historyKey, {});
+                setActiveTasks((prev) => prev.filter((x) => x.key !== historyKey));
+                break;
+              }
+              await new Promise((r) => setTimeout(r, 2000));
+            }
+          };
+          void poll();
+        }
+      }
+    };
+    void resume();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="w-screen h-screen relative">
@@ -1271,6 +1449,20 @@ export function Scene() {
             const cachedImage = await getGeneratedImage(imageId);
             if (cachedImage) {
               setGeneratedImageData(cachedImage.data);
+              // Save image-only history record for edited prompt
+              try {
+                const dataUrl = cachedImage.data.startsWith('data:')
+                  ? cachedImage.data
+                  : `data:image/png;base64,${cachedImage.data}`;
+                await addHistoryRecord({
+                  id: `${imageId}-image-${Date.now()}`,
+                  imageUrl: dataUrl,
+                  prompt: trimmed,
+                  time: Date.now(),
+                });
+              } catch (e) {
+                console.warn('Failed to write image history record (edit)', e);
+              }
             } else {
               const generatedImage = await generateImageViaAPI(enhancedPrompt);
               await saveGeneratedImage(imageId, {
@@ -1278,6 +1470,20 @@ export function Scene() {
                 prompt: trimmed,
               });
               setGeneratedImageData(generatedImage.data);
+              // Save image-only history record for newly generated edited prompt
+              try {
+                const dataUrl = generatedImage.data.startsWith('data:')
+                  ? generatedImage.data
+                  : `data:image/png;base64,${generatedImage.data}`;
+                await addHistoryRecord({
+                  id: `${imageId}-image-${Date.now()}`,
+                  imageUrl: dataUrl,
+                  prompt: trimmed,
+                  time: Date.now(),
+                });
+              } catch (e) {
+                console.warn('Failed to write image history record (edit/new)', e);
+              }
             }
           } catch (error) {
             console.error('Error generating image:', error);
@@ -1307,30 +1513,30 @@ export function Scene() {
       />
 
       {/* Bottom-left generation progress button */}
-      {isGenerating3D && (
-        <div className="absolute bottom-4 left-4 z-10">
-          <button
-            className="flex items-center gap-3 bg-white/90 hover:bg-white rounded-lg shadow-lg transition-all hover:shadow-xl px-3 py-2"
-            aria-label="Generating 3D model"
-            title="Generating 3D model"
-          >
-            {generatedImageData && (
-              <img
-                src={`data:image/png;base64,${generatedImageData}`}
-                alt="Prompt thumbnail"
-                className="w-8 h-8 object-cover"
-              />
-            )}
-            <span className="text-sm text-gray-700 truncate max-w-[240px]">
-              {submittedPrompt}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-600">
-                {generation3DProgress}%
+      {(activeTasks.length > 0) && (
+        <div className="absolute bottom-4 left-4 z-10 space-y-2">
+          {activeTasks.map((t) => (
+            <div
+              key={t.key}
+              className="flex items-center gap-3 bg-white/90 rounded-lg shadow-lg px-3 py-2"
+              title={`${t.provider} ${t.status}`}
+            >
+              {t.imageData && (
+                <img
+                  src={`data:image/png;base64,${t.imageData}`}
+                  alt="Prompt thumbnail"
+                  className="w-8 h-8 object-cover"
+                />
+              )}
+              <span className="text-sm text-gray-700 truncate max-w-[240px]">
+                {t.prompt}
               </span>
-              <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-xs text-gray-600">{t.progress}%</span>
+                <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
+              </div>
             </div>
-          </button>
+          ))}
         </div>
       )}
     </div>

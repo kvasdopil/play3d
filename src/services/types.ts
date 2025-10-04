@@ -24,6 +24,11 @@ export interface HistoryRecord {
   imageUrl?: string;
   prompt: string;
   time: number;
+  // Optional tracking fields for in-progress tasks
+  taskId?: string;
+  provider?: 'Synexa' | 'Tripo';
+  status?: 'queued' | 'processing' | 'completed' | 'failed' | 'unknown';
+  progress?: number;
 }
 
 export interface Model3DResult {

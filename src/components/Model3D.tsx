@@ -1,6 +1,6 @@
 import { useEffect, useState, memo } from 'react';
-import { useGLTF } from '@react-three/drei';
 import type { GLTF } from 'three-stdlib';
+import { GLTFLoader } from 'three-stdlib';
 import type { Transform } from '../services/types';
 import {
   Box3,
@@ -14,7 +14,9 @@ import {
   WebGLRenderer,
   Scene as ThreeScene,
   Camera,
+  MeshStandardMaterial,
 } from 'three';
+import { PlaceholderCube } from './PlaceholderCube';
 
 interface Model3DProps {
   modelUrl: string;
@@ -22,6 +24,12 @@ interface Model3DProps {
   renderMode?: 'textured' | 'solid';
   colorHex?: string; // used in solid mode
 }
+
+const DEFAULT_TRANSFORM: Transform = {
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
+  scale: 1,
+};
 
 export const Model3D = memo(
   function Model3D({
@@ -31,6 +39,7 @@ export const Model3D = memo(
     colorHex,
   }: Model3DProps) {
     const [localUrl, setLocalUrl] = useState<string | null>(null);
+    const [failed, setFailed] = useState<boolean>(false);
 
     useEffect(() => {
       let isMounted = true;
@@ -40,6 +49,9 @@ export const Model3D = memo(
       const loadModel = async () => {
         try {
           const response = await fetch(modelUrl);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
           const blob = await response.blob();
           const url = URL.createObjectURL(blob);
           blobUrl = url;
@@ -53,6 +65,7 @@ export const Model3D = memo(
           }
         } catch (error) {
           console.error('❌ Failed to load model:', error);
+          if (isMounted) setFailed(true);
         }
       };
 
@@ -67,9 +80,13 @@ export const Model3D = memo(
       };
     }, [modelUrl]);
 
-    if (!localUrl) {
-      return null;
+    if (failed) {
+      return (
+        <PlaceholderCube transform={transform} />
+      );
     }
+
+    if (!localUrl) return null;
 
     return (
       <LoadedModel
@@ -102,7 +119,28 @@ const LoadedModel = memo(
     renderMode?: 'textured' | 'solid';
     colorHex?: string;
   }) {
-    const gltf = useGLTF(url) as GLTF;
+    const [gltf, setGltf] = useState<GLTF | null>(null);
+    const [loadError, setLoadError] = useState<boolean>(false);
+
+    useEffect(() => {
+      let isMounted = true;
+      const loader = new GLTFLoader();
+      loader.load(
+        url,
+        (data) => {
+          if (!isMounted) return;
+          setGltf(data as GLTF);
+        },
+        undefined,
+        (err) => {
+          console.error('❌ Failed to parse GLTF:', err);
+          if (isMounted) setLoadError(true);
+        }
+      );
+      return () => {
+        isMounted = false;
+      };
+    }, [url]);
 
     // Compute and store model-space bounding box once after load
     useEffect(() => {
@@ -119,13 +157,7 @@ const LoadedModel = memo(
       };
     }, [gltf]);
 
-    const defaultTransform: Transform = {
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      scale: 1,
-    };
-
-    const t = transform || defaultTransform;
+    const t = transform || DEFAULT_TRANSFORM;
 
     // Toggle material sets based on renderMode
     useEffect(() => {
@@ -200,13 +232,13 @@ const LoadedModel = memo(
               const original = (n.userData as Record<string, unknown>)
                 .__originalOnAfterRender as
                 | ((
-                    renderer: WebGLRenderer,
-                    scene: ThreeScene,
-                    camera: Camera,
-                    geometry: BufferGeometry,
-                    material: Material,
-                    group: Group
-                  ) => void)
+                  renderer: WebGLRenderer,
+                  scene: ThreeScene,
+                  camera: Camera,
+                  geometry: BufferGeometry,
+                  material: Material,
+                  group: Group
+                ) => void)
                 | undefined;
               if (original) {
                 original(renderer, sceneArg, camera, geometry, material, group);
@@ -230,13 +262,13 @@ const LoadedModel = memo(
             const original = (n.userData as Record<string, unknown>)
               .__originalOnAfterRender as
               | ((
-                  renderer: WebGLRenderer,
-                  scene: ThreeScene,
-                  camera: Camera,
-                  geometry: BufferGeometry,
-                  material: Material,
-                  group: Group
-                ) => void)
+                renderer: WebGLRenderer,
+                scene: ThreeScene,
+                camera: Camera,
+                geometry: BufferGeometry,
+                material: Material,
+                group: Group
+              ) => void)
               | undefined;
             n.onAfterRender = (
               renderer: WebGLRenderer,
@@ -257,6 +289,12 @@ const LoadedModel = memo(
         });
       }
     }, [gltf, renderMode, colorHex]);
+
+    if (loadError) {
+      return <PlaceholderCube transform={transform} />;
+    }
+
+    if (!gltf) return null;
 
     return (
       <primitive
