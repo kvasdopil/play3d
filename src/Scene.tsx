@@ -707,8 +707,10 @@ export function Scene() {
           await updateHistoryRecord(historyKey, { status, progress });
 
           if (status === 'completed') {
-            // Ensure modelUrl; fallback to download for Synexa
-            let finalModelUrl = modelUrl;
+            // For Tripo, always use our cached download endpoint; for Synexa, use provided URL or fallback to download
+            let finalModelUrl = provider === 'Tripo'
+              ? `/api/gen/3d/tripo/${encodeURIComponent(taskId)}/download`
+              : modelUrl;
             if (!finalModelUrl && provider === 'Synexa') {
               try {
                 const dl = await fetch(`/api/gen/3d/synexa/${encodeURIComponent(taskId)}/download`);
@@ -728,9 +730,12 @@ export function Scene() {
                 prompt: submittedPrompt,
                 timestamp: Date.now(),
               });
-              await updateHistoryRecord(historyKey, {
-                modelUrl: finalModelUrl,
-              });
+              // Do not store external URL in history for Tripo; keep taskId/provider only
+              if (provider !== 'Tripo') {
+                await updateHistoryRecord(historyKey, {
+                  modelUrl: finalModelUrl,
+                });
+              }
 
               // Add to scene if not exists
               const exists = sceneObjects.some((o) => o.modelUrl === finalModelUrl);
@@ -873,7 +878,10 @@ export function Scene() {
               await updateHistoryRecord(historyKey, { status, progress });
 
               if (status === 'completed') {
-                let finalModelUrl = modelUrl;
+                // For Tripo, always use our cached download endpoint; for Synexa, use provided URL or fallback to download
+                let finalModelUrl = provider === 'Tripo'
+                  ? `/api/gen/3d/tripo/${encodeURIComponent(taskId)}/download`
+                  : modelUrl;
                 if (!finalModelUrl && provider === 'Synexa') {
                   try {
                     const dl = await fetch(`/api/gen/3d/synexa/${encodeURIComponent(taskId)}/download`);
@@ -892,7 +900,9 @@ export function Scene() {
                     prompt: t.prompt,
                     timestamp: Date.now(),
                   });
-                  await updateHistoryRecord(historyKey, { modelUrl: finalModelUrl });
+                  if (provider !== 'Tripo') {
+                    await updateHistoryRecord(historyKey, { modelUrl: finalModelUrl });
+                  }
                   const exists = sceneObjects.some((o) => o.modelUrl === finalModelUrl);
                   if (!exists) {
                     const newSceneObject: SceneObject = {
@@ -1308,7 +1318,7 @@ export function Scene() {
             !isTransforming &&
             !isTransformHovered
           }
-          onSetIndex={(index) => setIsoIndex(index % 8)}
+          onStep={(delta) => setIsoIndex((prev) => (prev + delta + 8) % 8)}
         />
         {/* Persist camera position and orbit target across reloads */}
         <PersistCamera controlsRef={orbitControlsRef} />

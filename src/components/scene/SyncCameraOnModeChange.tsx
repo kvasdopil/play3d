@@ -62,7 +62,7 @@ export function SyncCameraOnModeChange({
       lastPoseRef.current?.position.clone() ?? camera.position.clone();
 
     // 8 views on constant-elevation circle (see CameraRig)
-    const targetIsoPositions = Array.from({ length: 8 }, (_, k) => {
+    const isoOffsets = Array.from({ length: 8 }, (_, k) => {
       const theta = (k * Math.PI) / 4;
       return new Vector3(
         Math.SQRT2 * Math.cos(theta),
@@ -71,9 +71,13 @@ export function SyncCameraOnModeChange({
       ).multiplyScalar(5);
     });
 
+    // Always orbit around the current target in isometric mode to keep
+    // the camera orientation fixed (pitch ~35.264°, yaw = k*45°)
+    const baseTarget = controls.target.clone();
+
     const to =
       mode === 'isometric'
-        ? targetIsoPositions[isoIndex % 8]
+        ? baseTarget.clone().add(isoOffsets[isoIndex % 8])
         : lastPerspectivePosRef.current.clone();
 
     let raf = 0;

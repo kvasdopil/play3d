@@ -75,22 +75,23 @@ export function IsoDragRotate({
       if (delta > Math.PI) delta -= 2 * Math.PI;
       if (delta <= -Math.PI) delta += 2 * Math.PI;
 
-      // Map current angle to nearest of 8 sectors centered at k*45°
-      let sector = Math.round(currentAngle / stepAngle);
-      // normalize to 0..7
-      sector = ((sector % 8) + 8) % 8;
-      if (lastSectorRef.current !== sector) {
-        if (onSetIndex) {
-          onSetIndex(sector);
-        } else if (onStep) {
-          const prev = lastSectorRef.current ?? sector;
-          let diff = sector - prev;
-          // wrap minimal diff to [-4, 3]
-          if (diff > 4) diff -= 8;
-          if (diff < -4) diff += 8;
-          if (diff !== 0) onStep(diff);
+      // Prefer relative stepping when available
+      if (onStep) {
+        const stepsNow = Math.round(delta / stepAngle);
+        const prevSteps = lastEmittedStepsRef.current;
+        const diff = stepsNow - prevSteps;
+        if (diff !== 0) {
+          onStep(diff);
+          lastEmittedStepsRef.current = stepsNow;
         }
-        lastSectorRef.current = sector;
+      } else {
+        // Fallback: absolute sector mapping to k*45° around screen center
+        let sector = Math.round(currentAngle / stepAngle);
+        sector = ((sector % 8) + 8) % 8; // normalize to 0..7
+        if (lastSectorRef.current !== sector) {
+          onSetIndex?.(sector);
+          lastSectorRef.current = sector;
+        }
       }
       if (activeRef.current) e.preventDefault();
     };

@@ -44,6 +44,8 @@ export function CameraRig({
     const index = isoIndex % 8;
     const initial = lastPoseRef.current?.position ?? isoPositions[index];
     const theta = (index * Math.PI) / 4;
+    // True isometric pitch is arctan(1/√2) ≈ 35.264° downward from horizontal
+    const isoPitch = Math.atan(1 / Math.SQRT2);
     return (
       <OrthographicCamera
         makeDefault
@@ -54,7 +56,7 @@ export function CameraRig({
         near={-1000}
         far={1000}
         position={[initial.x, initial.y, initial.z]}
-        rotation={[Math.atan(Math.sqrt(2)), theta, 0]}
+        rotation={[isoPitch, theta, 0]}
       />
     );
   }

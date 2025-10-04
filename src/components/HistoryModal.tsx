@@ -26,6 +26,8 @@ export function HistoryModal({
     prompt?: string;
     timestamp?: number;
     imageData?: string; // base64 image data for thumbnail
+    provider?: 'Synexa' | 'Tripo';
+    taskId?: string;
   }
 
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -110,6 +112,8 @@ export function HistoryModal({
             prompt: value.prompt,
             timestamp: value.time,
             imageData,
+            provider: value.provider as 'Synexa' | 'Tripo' | undefined,
+            taskId: value.taskId as string | undefined,
           };
         });
         collected.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
@@ -209,13 +213,17 @@ export function HistoryModal({
                       </div>
                     </div>
                   </div>
-                  {obj.modelUrl && (
+                  {(obj.modelUrl || (obj.provider === 'Tripo' && obj.taskId)) && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        const url = obj.modelUrl || (obj.provider === 'Tripo' && obj.taskId
+                          ? `/api/gen/3d/tripo/${encodeURIComponent(obj.taskId)}/download`
+                          : undefined);
+                        if (!url) return;
                         onAddToScene?.({
                           id: obj.id,
-                          modelUrl: obj.modelUrl!,
+                          modelUrl: url,
                           prompt: obj.prompt,
                           timestamp: obj.timestamp,
                         });
