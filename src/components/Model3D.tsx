@@ -229,13 +229,13 @@ const LoadedModel = memo(
               const original = (n.userData as Record<string, unknown>)
                 .__originalOnAfterRender as
                 | ((
-                  renderer: WebGLRenderer,
-                  scene: ThreeScene,
-                  camera: Camera,
-                  geometry: BufferGeometry,
-                  material: Material,
-                  group: Group
-                ) => void)
+                    renderer: WebGLRenderer,
+                    scene: ThreeScene,
+                    camera: Camera,
+                    geometry: BufferGeometry,
+                    material: Material,
+                    group: Group
+                  ) => void)
                 | undefined;
               if (original) {
                 original(renderer, sceneArg, camera, geometry, material, group);
@@ -259,13 +259,13 @@ const LoadedModel = memo(
             const original = (n.userData as Record<string, unknown>)
               .__originalOnAfterRender as
               | ((
-                renderer: WebGLRenderer,
-                scene: ThreeScene,
-                camera: Camera,
-                geometry: BufferGeometry,
-                material: Material,
-                group: Group
-              ) => void)
+                  renderer: WebGLRenderer,
+                  scene: ThreeScene,
+                  camera: Camera,
+                  geometry: BufferGeometry,
+                  material: Material,
+                  group: Group
+                ) => void)
               | undefined;
             n.onAfterRender = (
               renderer: WebGLRenderer,

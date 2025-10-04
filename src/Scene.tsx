@@ -88,7 +88,7 @@ function CheckerPlane({
     <mesh
       position={[0, 0, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
-      raycast={() => { }}
+      raycast={() => {}}
       renderOrder={-1}
     >
       <planeGeometry args={[size, size, 1, 1]} />
@@ -122,7 +122,6 @@ async function generateImageViaAPI(prompt: string) {
 
   return await response.json();
 }
-
 
 // (removed CanvasLogger debug component)
 
@@ -749,7 +748,13 @@ export function Scene() {
               : value.imageUrl
             : undefined,
         progress: typeof value.progress === 'number' ? value.progress : 0,
-        status: (value.status as 'queued' | 'processing' | 'completed' | 'failed' | 'unknown') || 'queued',
+        status:
+          (value.status as
+            | 'queued'
+            | 'processing'
+            | 'completed'
+            | 'failed'
+            | 'unknown') || 'queued',
       }));
       if (cancelled) return;
       if (toActivate.length > 0) {

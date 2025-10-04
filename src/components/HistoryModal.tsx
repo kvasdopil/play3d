@@ -226,27 +226,27 @@ export function HistoryModal({
                   </div>
                   {(obj.modelUrl ||
                     (obj.provider === 'Tripo' && obj.taskId)) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const url =
-                            obj.modelUrl ||
-                            (obj.provider === 'Tripo' && obj.taskId
-                              ? `/api/gen/3d/tripo/${encodeURIComponent(obj.taskId)}/download`
-                              : undefined);
-                          if (!url) return;
-                          onAddToScene?.({
-                            id: obj.id,
-                            modelUrl: url,
-                            prompt: obj.prompt,
-                            timestamp: obj.timestamp,
-                          });
-                        }}
-                        className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors whitespace-nowrap"
-                      >
-                        Add to scene
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const url =
+                          obj.modelUrl ||
+                          (obj.provider === 'Tripo' && obj.taskId
+                            ? `/api/gen/3d/tripo/${encodeURIComponent(obj.taskId)}/download`
+                            : undefined);
+                        if (!url) return;
+                        onAddToScene?.({
+                          id: obj.id,
+                          modelUrl: url,
+                          prompt: obj.prompt,
+                          timestamp: obj.timestamp,
+                        });
+                      }}
+                      className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors whitespace-nowrap"
+                    >
+                      Add to scene
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
