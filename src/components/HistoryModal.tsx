@@ -50,12 +50,23 @@ export function HistoryModal({
       return;
     }
     try {
-      const reader = new FileReader();
-      const dataUrl: string = await new Promise((resolve, reject) => {
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.onload = () => resolve(String(reader.result));
-        reader.readAsDataURL(file);
+      // Create FormData for upload
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload the file
+      const uploadResponse = await fetch('/api/upload/glb', {
+        method: 'POST',
+        body: formData,
       });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const uploadResult = await uploadResponse.json();
+      const { fileUrl, uuid } = uploadResult;
 
       // Filename (without extension) becomes the prompt
       const nameNoExt = file.name.replace(/\.[^/.]+$/, '');
@@ -66,8 +77,8 @@ export function HistoryModal({
 
       const time = Date.now();
       const key = await addHistoryRecord({
-        id: `manual-${time}`,
-        modelUrl: dataUrl,
+        id: uuid,
+        modelUrl: fileUrl,
         imageUrl: '',
         prompt,
         time,
@@ -77,7 +88,7 @@ export function HistoryModal({
       setItems((prev) => [
         {
           id: key,
-          modelUrl: dataUrl,
+          modelUrl: fileUrl,
           prompt,
           timestamp: time,
           imageData: undefined,
@@ -213,26 +224,29 @@ export function HistoryModal({
                       </div>
                     </div>
                   </div>
-                  {(obj.modelUrl || (obj.provider === 'Tripo' && obj.taskId)) && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const url = obj.modelUrl || (obj.provider === 'Tripo' && obj.taskId
-                          ? `/api/gen/3d/tripo/${encodeURIComponent(obj.taskId)}/download`
-                          : undefined);
-                        if (!url) return;
-                        onAddToScene?.({
-                          id: obj.id,
-                          modelUrl: url,
-                          prompt: obj.prompt,
-                          timestamp: obj.timestamp,
-                        });
-                      }}
-                      className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors whitespace-nowrap"
-                    >
-                      Add to scene
-                    </button>
-                  )}
+                  {(obj.modelUrl ||
+                    (obj.provider === 'Tripo' && obj.taskId)) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url =
+                            obj.modelUrl ||
+                            (obj.provider === 'Tripo' && obj.taskId
+                              ? `/api/gen/3d/tripo/${encodeURIComponent(obj.taskId)}/download`
+                              : undefined);
+                          if (!url) return;
+                          onAddToScene?.({
+                            id: obj.id,
+                            modelUrl: url,
+                            prompt: obj.prompt,
+                            timestamp: obj.timestamp,
+                          });
+                        }}
+                        className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors whitespace-nowrap"
+                      >
+                        Add to scene
+                      </button>
+                    )}
                 </div>
               </div>
             ))}

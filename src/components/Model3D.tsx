@@ -14,7 +14,6 @@ import {
   WebGLRenderer,
   Scene as ThreeScene,
   Camera,
-  MeshStandardMaterial,
 } from 'three';
 import { PlaceholderCube } from './PlaceholderCube';
 
@@ -81,9 +80,7 @@ export const Model3D = memo(
     }, [modelUrl]);
 
     if (failed) {
-      return (
-        <PlaceholderCube transform={transform} />
-      );
+      return <PlaceholderCube transform={transform} />;
     }
 
     if (!localUrl) return null;

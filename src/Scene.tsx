@@ -7,7 +7,14 @@ import type {
   OrbitControls as ThreeOrbitControls,
   TransformControls as ThreeTransformControls,
 } from 'three-stdlib';
-import { Box3, Vector3, CanvasTexture, RepeatWrapping, SRGBColorSpace, DoubleSide, NearestFilter } from 'three';
+import {
+  Box3,
+  Vector3,
+  CanvasTexture,
+  RepeatWrapping,
+  SRGBColorSpace,
+  NearestFilter,
+} from 'three';
 import { IoSettingsSharp, IoTrashSharp, IoTimeOutline } from 'react-icons/io5';
 import { IoAdd } from 'react-icons/io5';
 import { RotatingCube } from './RotatingCube';
@@ -22,7 +29,6 @@ import {
   getGeneratedImage,
   generateImageId,
   save3DModel,
-  get3DModel,
   generate3DModelId,
   getSceneObjects,
   saveSceneObjects,
@@ -47,7 +53,13 @@ import { CursorWheelZoom } from './components/scene/CursorWheelZoom';
 import { SelectionBounds } from './components/scene/SelectionBounds';
 import { IsoDragRotate } from './components/scene/IsoDragRotate';
 
-function CheckerPlane({ size = 10, repeat = 40 }: { size?: number; repeat?: number }) {
+function CheckerPlane({
+  size = 10,
+  repeat = 40,
+}: {
+  size?: number;
+  repeat?: number;
+}) {
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 2;
@@ -73,7 +85,12 @@ function CheckerPlane({ size = 10, repeat = 40 }: { size?: number; repeat?: numb
   }, [repeat]);
 
   return (
-    <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => { }} renderOrder={-1}>
+    <mesh
+      position={[0, 0, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      raycast={() => { }}
+      renderOrder={-1}
+    >
       <planeGeometry args={[size, size, 1, 1]} />
       <meshStandardMaterial
         map={texture}
@@ -106,134 +123,6 @@ async function generateImageViaAPI(prompt: string) {
   return await response.json();
 }
 
-// Function to generate 3D model via Synexa API endpoints
-async function generate3DModelViaSynexaAPI(
-  imageDataUrl: string,
-  prompt: string,
-  onProgress?: (status: string, logs?: Array<{ message: string }>) => void
-): Promise<{ modelUrl: string; prompt: string; timestamp: number }> {
-  // Start the generation
-  const startResponse = await fetch('/api/gen/3d/synexa', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ imageDataUrl, prompt }),
-  });
-
-  if (!startResponse.ok) {
-    const error = await startResponse.json();
-    throw new Error(error.error || 'Failed to start 3D generation');
-  }
-
-  const { taskId } = await startResponse.json();
-
-  // Poll for completion
-  while (true) {
-    const statusResponse = await fetch(`/api/gen/3d/synexa/${taskId}`);
-
-    if (!statusResponse.ok) {
-      const error = await statusResponse.json();
-      throw new Error(error.error || 'Failed to check generation status');
-    }
-
-    const statusData = await statusResponse.json();
-
-    if (onProgress) {
-      onProgress(statusData.status, statusData.logs);
-    }
-
-    if (statusData.status === 'completed') {
-      // Prefer explicit modelUrl from the API
-      let modelUrl: string | undefined = statusData.modelUrl;
-      // Fallback to result structure if present
-      if (!modelUrl) {
-        modelUrl = statusData.result?.model_mesh?.url || statusData.result?.url;
-      }
-      // As a last resort, call the download endpoint to materialize the file
-      if (!modelUrl) {
-        const dl = await fetch(`/api/gen/3d/synexa/${taskId}/download`);
-        if (!dl.ok) {
-          const err = await dl.json().catch(() => ({}));
-          throw new Error(err.error || 'Failed to download generated model');
-        }
-        // Create an object URL from the blob for immediate use
-        const blob = await dl.blob();
-        modelUrl = URL.createObjectURL(blob);
-      }
-
-      return {
-        modelUrl,
-        prompt,
-        timestamp: Date.now(),
-      };
-    } else if (statusData.status === 'failed') {
-      throw new Error('3D generation failed');
-    }
-
-    // Wait 2 seconds before checking again
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-}
-
-// Function to generate 3D model via Tripo API endpoints
-async function generate3DModelViaTripoAPI(
-  imageDataUrl: string,
-  prompt: string,
-  onProgress?: (status: string, progress?: number) => void
-): Promise<{ modelUrl: string; prompt: string; timestamp: number }> {
-  // Start the generation (upload + create job)
-  const startResponse = await fetch('/api/gen/3d/tripo', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ imageDataUrl, prompt }),
-  });
-
-  if (!startResponse.ok) {
-    const error = await startResponse.json();
-    throw new Error(error.error || 'Failed to start 3D generation');
-  }
-
-  const { taskId } = await startResponse.json();
-
-  // Poll for completion
-  while (true) {
-    const statusResponse = await fetch(`/api/gen/3d/tripo/${taskId}`);
-
-    if (!statusResponse.ok) {
-      const error = await statusResponse.json();
-      throw new Error(error.error || 'Failed to check generation status');
-    }
-
-    const statusData = await statusResponse.json();
-
-    if (onProgress) {
-      onProgress(statusData.status, statusData.progress);
-    }
-
-    if (statusData.status === 'completed') {
-      // Get the model URL from the status response
-      const modelUrl = statusData.modelUrl;
-      if (!modelUrl) {
-        throw new Error('No model URL in completed result');
-      }
-
-      return {
-        modelUrl,
-        prompt,
-        timestamp: Date.now(),
-      };
-    } else if (statusData.status === 'failed') {
-      const errorMsg = statusData.error || '3D generation failed';
-      throw new Error(errorMsg);
-    }
-
-    // Wait 2 seconds before checking again
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-}
 
 // (removed CanvasLogger debug component)
 
@@ -249,8 +138,8 @@ export function Scene() {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageError, setImageError] = useState<string | undefined>();
   const [modelUrl, setModelUrl] = useState<string | undefined>();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isGenerating3D, setIsGenerating3D] = useState(false);
-  const [generation3DProgress, setGeneration3DProgress] = useState(0);
   const [error3D, setError3D] = useState<string | undefined>();
   const [activeTasks, setActiveTasks] = useState<
     Array<{
@@ -524,7 +413,7 @@ export function Scene() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isTransforming, selectedId]);
+  }, [isTransforming, selectedId, transformMode]);
 
   const handlePromptSubmit = async () => {
     if (promptValue.trim()) {
@@ -631,11 +520,15 @@ export function Scene() {
 
     try {
       // Create provider-specific start
-      const startUrl = provider === 'Synexa' ? '/api/gen/3d/synexa' : '/api/gen/3d/tripo';
+      const startUrl =
+        provider === 'Synexa' ? '/api/gen/3d/synexa' : '/api/gen/3d/tripo';
       const startResp = await fetch(startUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageDataUrl: generatedImageData, prompt: submittedPrompt }),
+        body: JSON.stringify({
+          imageDataUrl: generatedImageData,
+          prompt: submittedPrompt,
+        }),
       });
       if (!startResp.ok) {
         const err = await startResp.json().catch(() => ({}));
@@ -681,7 +574,12 @@ export function Scene() {
             ? `/api/gen/3d/synexa/${encodeURIComponent(taskId)}`
             : `/api/gen/3d/tripo/${encodeURIComponent(taskId)}`;
         while (true) {
-          let status: 'queued' | 'processing' | 'completed' | 'failed' | 'unknown' = 'unknown';
+          let status:
+            | 'queued'
+            | 'processing'
+            | 'completed'
+            | 'failed'
+            | 'unknown' = 'unknown';
           let progress = 0;
           let modelUrl: string | undefined;
           try {
@@ -692,7 +590,16 @@ export function Scene() {
             }
             const json = await resp.json();
             status = json.status || 'unknown';
-            progress = typeof json.progress === 'number' ? json.progress : status === 'processing' ? 50 : status === 'queued' ? 0 : status === 'completed' ? 100 : 0;
+            progress =
+              typeof json.progress === 'number'
+                ? json.progress
+                : status === 'processing'
+                  ? 50
+                  : status === 'queued'
+                    ? 0
+                    : status === 'completed'
+                      ? 100
+                      : 0;
             modelUrl = json.modelUrl || undefined;
           } catch (e) {
             console.warn('Polling error', e);
@@ -708,12 +615,15 @@ export function Scene() {
 
           if (status === 'completed') {
             // For Tripo, always use our cached download endpoint; for Synexa, use provided URL or fallback to download
-            let finalModelUrl = provider === 'Tripo'
-              ? `/api/gen/3d/tripo/${encodeURIComponent(taskId)}/download`
-              : modelUrl;
+            let finalModelUrl =
+              provider === 'Tripo'
+                ? `/api/gen/3d/tripo/${encodeURIComponent(taskId)}/download`
+                : modelUrl;
             if (!finalModelUrl && provider === 'Synexa') {
               try {
-                const dl = await fetch(`/api/gen/3d/synexa/${encodeURIComponent(taskId)}/download`);
+                const dl = await fetch(
+                  `/api/gen/3d/synexa/${encodeURIComponent(taskId)}/download`
+                );
                 if (dl.ok) {
                   const blob = await dl.blob();
                   finalModelUrl = URL.createObjectURL(blob);
@@ -738,12 +648,18 @@ export function Scene() {
               }
 
               // Add to scene if not exists
-              const exists = sceneObjects.some((o) => o.modelUrl === finalModelUrl);
+              const exists = sceneObjects.some(
+                (o) => o.modelUrl === finalModelUrl
+              );
               if (!exists) {
                 const newSceneObject: SceneObject = {
                   id: modelId,
                   modelUrl: finalModelUrl,
-                  transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
+                  transform: {
+                    position: [0, 0, 0],
+                    rotation: [0, 0, 0],
+                    scale: 1,
+                  },
                   prompt: submittedPrompt,
                   timestamp: Date.now(),
                 };
@@ -815,21 +731,25 @@ export function Scene() {
     let cancelled = false;
     const resume = async () => {
       const rows = await listHistoryRecords();
-      const pending = rows.filter(({ value }) =>
-        value.taskId && value.status !== 'completed' && value.status !== 'failed'
+      const pending = rows.filter(
+        ({ value }) =>
+          value.taskId &&
+          value.status !== 'completed' &&
+          value.status !== 'failed'
       );
       const toActivate = pending.map(({ key, value }) => ({
         key,
         taskId: String(value.taskId),
         provider: (value.provider as 'Synexa' | 'Tripo') || 'Synexa',
         prompt: value.prompt,
-        imageData: typeof value.imageUrl === 'string'
-          ? value.imageUrl.startsWith('data:')
-            ? value.imageUrl.replace(/^data:\w+\/[A-Za-z0-9.+-]+;base64,/, '')
-            : value.imageUrl
-          : undefined,
+        imageData:
+          typeof value.imageUrl === 'string'
+            ? value.imageUrl.startsWith('data:')
+              ? value.imageUrl.replace(/^data:\w+\/[A-Za-z0-9.+-]+;base64,/, '')
+              : value.imageUrl
+            : undefined,
         progress: typeof value.progress === 'number' ? value.progress : 0,
-        status: (value.status as any) || 'queued',
+        status: (value.status as 'queued' | 'processing' | 'completed' | 'failed' | 'unknown') || 'queued',
       }));
       if (cancelled) return;
       if (toActivate.length > 0) {
@@ -855,7 +775,12 @@ export function Scene() {
           const modelIdBase = `${provider}:${t.prompt}`;
           const poll = async () => {
             while (true) {
-              let status: 'queued' | 'processing' | 'completed' | 'failed' | 'unknown' = 'unknown';
+              let status:
+                | 'queued'
+                | 'processing'
+                | 'completed'
+                | 'failed'
+                | 'unknown' = 'unknown';
               let progress = 0;
               let modelUrl: string | undefined;
               try {
@@ -866,25 +791,41 @@ export function Scene() {
                 }
                 const json = await resp.json();
                 status = json.status || 'unknown';
-                progress = typeof json.progress === 'number' ? json.progress : status === 'processing' ? 50 : status === 'queued' ? 0 : status === 'completed' ? 100 : 0;
+                progress =
+                  typeof json.progress === 'number'
+                    ? json.progress
+                    : status === 'processing'
+                      ? 50
+                      : status === 'queued'
+                        ? 0
+                        : status === 'completed'
+                          ? 100
+                          : 0;
                 modelUrl = json.modelUrl || undefined;
               } catch (e) {
                 console.warn('Resume polling error', e);
               }
 
               setActiveTasks((prev) =>
-                prev.map((x) => (x.key === historyKey ? { ...x, status, progress, modelUrl } : x))
+                prev.map((x) =>
+                  x.key === historyKey
+                    ? { ...x, status, progress, modelUrl }
+                    : x
+                )
               );
               await updateHistoryRecord(historyKey, { status, progress });
 
               if (status === 'completed') {
                 // For Tripo, always use our cached download endpoint; for Synexa, use provided URL or fallback to download
-                let finalModelUrl = provider === 'Tripo'
-                  ? `/api/gen/3d/tripo/${encodeURIComponent(taskId)}/download`
-                  : modelUrl;
+                let finalModelUrl =
+                  provider === 'Tripo'
+                    ? `/api/gen/3d/tripo/${encodeURIComponent(taskId)}/download`
+                    : modelUrl;
                 if (!finalModelUrl && provider === 'Synexa') {
                   try {
-                    const dl = await fetch(`/api/gen/3d/synexa/${encodeURIComponent(taskId)}/download`);
+                    const dl = await fetch(
+                      `/api/gen/3d/synexa/${encodeURIComponent(taskId)}/download`
+                    );
                     if (dl.ok) {
                       const blob = await dl.blob();
                       finalModelUrl = URL.createObjectURL(blob);
@@ -901,26 +842,38 @@ export function Scene() {
                     timestamp: Date.now(),
                   });
                   if (provider !== 'Tripo') {
-                    await updateHistoryRecord(historyKey, { modelUrl: finalModelUrl });
+                    await updateHistoryRecord(historyKey, {
+                      modelUrl: finalModelUrl,
+                    });
                   }
-                  const exists = sceneObjects.some((o) => o.modelUrl === finalModelUrl);
+                  const exists = sceneObjects.some(
+                    (o) => o.modelUrl === finalModelUrl
+                  );
                   if (!exists) {
                     const newSceneObject: SceneObject = {
                       id: modelId,
                       modelUrl: finalModelUrl,
-                      transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 },
+                      transform: {
+                        position: [0, 0, 0],
+                        rotation: [0, 0, 0],
+                        scale: 1,
+                      },
                       prompt: t.prompt,
                       timestamp: Date.now(),
                     };
                     setSceneObjects((prev) => [...prev, newSceneObject]);
                   }
                 }
-                setActiveTasks((prev) => prev.filter((x) => x.key !== historyKey));
+                setActiveTasks((prev) =>
+                  prev.filter((x) => x.key !== historyKey)
+                );
                 break;
               }
               if (status === 'failed') {
                 await updateHistoryRecord(historyKey, {});
-                setActiveTasks((prev) => prev.filter((x) => x.key !== historyKey));
+                setActiveTasks((prev) =>
+                  prev.filter((x) => x.key !== historyKey)
+                );
                 break;
               }
               await new Promise((r) => setTimeout(r, 2000));
@@ -934,7 +887,7 @@ export function Scene() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sceneObjects]);
 
   return (
     <div className="w-screen h-screen relative">
@@ -1492,7 +1445,10 @@ export function Scene() {
                   time: Date.now(),
                 });
               } catch (e) {
-                console.warn('Failed to write image history record (edit/new)', e);
+                console.warn(
+                  'Failed to write image history record (edit/new)',
+                  e
+                );
               }
             }
           } catch (error) {
@@ -1523,7 +1479,7 @@ export function Scene() {
       />
 
       {/* Bottom-left generation progress button */}
-      {(activeTasks.length > 0) && (
+      {activeTasks.length > 0 && (
         <div className="absolute bottom-4 left-4 z-10 space-y-2">
           {activeTasks.map((t) => (
             <div

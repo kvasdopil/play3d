@@ -93,7 +93,7 @@ export function SyncCameraOnModeChange({
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [mode, isoIndex, controlsRef, camera, lastPerspectivePosRef]);
+  }, [mode, isoIndex, controlsRef, camera, lastPerspectivePosRef, lastPoseRef]);
 
   return null;
 }

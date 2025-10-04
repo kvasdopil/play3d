@@ -16,11 +16,16 @@ function getAssetsPath(taskId: string): string {
 function streamFile(filePath: string): Response {
   const stat = fs.statSync(filePath);
   const nodeStream = fs.createReadStream(filePath);
-  const webStream = Readable.toWeb(nodeStream) as unknown as ReadableStream<Uint8Array>;
+  const webStream = Readable.toWeb(
+    nodeStream
+  ) as unknown as ReadableStream<Uint8Array>;
   const headers = new Headers();
   headers.set('Content-Type', 'application/octet-stream');
   headers.set('Content-Length', String(stat.size));
-  headers.set('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
+  headers.set(
+    'Content-Disposition',
+    `attachment; filename="${path.basename(filePath)}"`
+  );
   return new Response(webStream, { status: 200, headers });
 }
 
@@ -66,7 +71,8 @@ export async function GET(
     }
     const statusJson = await statusResponse.json();
     const modelUrl =
-      statusJson?.data?.output?.pbr_model || statusJson?.data?.result?.pbr_model;
+      statusJson?.data?.output?.pbr_model ||
+      statusJson?.data?.result?.pbr_model;
 
     if (!modelUrl) {
       return NextResponse.json(
@@ -88,21 +94,24 @@ export async function GET(
     const tempPath = `${filePath}.tmp`;
     await new Promise<void>((resolve, reject) => {
       const dest = fs.createWriteStream(tempPath);
-      const reader = modelResponse.body.getReader();
+      const reader = modelResponse.body!.getReader();
       const writer = dest;
 
       function pump() {
-        reader.read().then(({ done, value }) => {
-          if (done) {
-            writer.end();
-            resolve();
-            return;
-          }
-          if (value) {
-            writer.write(Buffer.from(value));
-          }
-          pump();
-        }).catch(reject);
+        reader
+          .read()
+          .then(({ done, value }) => {
+            if (done) {
+              writer.end();
+              resolve();
+              return;
+            }
+            if (value) {
+              writer.write(Buffer.from(value));
+            }
+            pump();
+          })
+          .catch(reject);
       }
       dest.on('error', reject);
       pump();
